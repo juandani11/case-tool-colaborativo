@@ -1,0 +1,180 @@
+# {{projectName}}
+
+Backend generado automáticamente a partir de un diagrama de entidades (AST). Basado en **Spring Boot 4.0.0**, **Java 21**, **PostgreSQL 18**, **Spring Security 7**, **JPA/Hibernate**, **Flyway** y **JWT**.
+
+---
+
+## Requisitos
+
+- **Java 21** (JDK)
+- **Maven 3.9+**
+- **PostgreSQL 18** (base de datos accesible)
+- Puerto **8080** libre
+
+---
+
+## Configuración de Base de Datos
+
+Por defecto, la aplicación espera una base de datos PostgreSQL con:
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/diagramdb
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+```
+
+Si necesitas cambiar la configuración, edita `src/main/resources/application.properties` o define variables de entorno:
+
+```bash
+export DB_URL=jdbc:postgresql://localhost:5432/tu_bd
+export DB_USER=tu_usuario
+export DB_PASS=tu_password
+```
+
+---
+
+## Ejecución
+
+```bash
+# Compilar y ejecutar
+mvn spring-boot:run
+```
+
+La aplicación se inicia en `http://localhost:8080`.
+
+---
+
+## Autenticación (JWT)
+
+El backend usa **autenticación stateless con JWT**. El usuario por defecto es:
+
+| Usuario | Contraseña | Rol |
+|---------|------------|-----|
+| `admin` | `admin` | `ROLE_USER` |
+
+### Login
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}'
+```
+
+Respuesta:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+### Uso del token
+
+Incluye el token en el header `Authorization` de cada petición protegida:
+
+```bash
+curl -X GET http://localhost:8080/api/entity1s \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+## Endpoints Disponibles
+
+{{#each entities}}
+### {{entityNamePascal}}
+
+| Método | URL | Descripción |
+|--------|-----|-------------|
+| GET    | `/api/{{pluralLowerCase entityName}}` | Listar todos los registros |
+| GET    | `/api/{{pluralLowerCase entityName}}/{id}` | Obtener por ID |
+| POST   | `/api/{{pluralLowerCase entityName}}` | Crear nuevo registro |
+| PUT    | `/api/{{pluralLowerCase entityName}}/{id}` | Actualizar registro |
+| DELETE | `/api/{{pluralLowerCase entityName}}/{id}` | Eliminar registro |
+
+**Campos del DTO:**
+{{#each attributes}}
+- `{{name}}` ({{javaType}}){{#if isPk}} — Clave primaria (autogenerada){{/if}}
+{{/each}}
+
+{{/each}}
+
+---
+
+## Autenticación (Pública)
+
+| Método | URL | Descripción |
+|--------|-----|-------------|
+| POST   | `/api/auth/login` | Autenticar usuario y obtener JWT |
+
+---
+
+## Migraciones de Base de Datos
+
+Las migraciones Flyway se encuentran en `src/main/resources/db/migration/`. Se ejecutan automáticamente al iniciar la aplicación.
+
+---
+
+## Seguridad
+
+- **CSRF deshabilitado** (API stateless)
+- **Sesiones stateless** (JWT)
+- **CORS habilitado** para `*`
+- **Form login y HTTP Basic deshabilitados**
+
+---
+
+## Estructura del Proyecto
+
+```
+src/
+├── main/
+│   ├── java/com/example/demo/
+│   │   ├── config/          # Configuración global (excepciones, CORS)
+│   │   ├── controller/      # Controladores REST
+│   │   ├── dto/             # Data Transfer Objects
+│   │   ├── entity/          # Entidades JPA
+│   │   ├── repository/      # Repositorios Spring Data JPA
+│   │   ├── security/        # JWT, filtros, configuración de seguridad
+│   │   ├── service/         # Lógica de negocio
+│   │   └── DemoApplication.java
+│   └── resources/
+│       ├── application.properties
+│       └── db/migration/    # Scripts Flyway
+└── test/
+```
+
+---
+
+## Pruebas Rápidas
+
+```bash
+# 1. Login
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+
+# 2. Listar entidades (ejemplo: entity1s)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entity1s
+
+# 3. Crear registro
+curl -X POST http://localhost:8080/api/entity1s \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test","description":"Descripción"}'
+
+# 4. Obtener por ID
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entity1s/<id>
+
+# 5. Actualizar
+curl -X PUT http://localhost:8080/api/entity1s/<id> \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Actualizado","description":"Nueva descripción"}'
+
+# 6. Eliminar
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entity1s/<id>
+```
+
+---
+
+*Generado automáticamente por **CASE Tool** — Generador de Backends Colaborativo*

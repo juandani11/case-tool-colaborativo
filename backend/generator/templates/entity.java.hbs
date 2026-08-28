@@ -1,0 +1,32 @@
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.UUID;
+import java.time.LocalDate;
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "{{entityNameCamel}}")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+public class {{entityNamePascal}} {
+
+    {{#if primaryKey.isUuid}}
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "{{primaryKey.name}}", updatable = false, nullable = false)
+    private UUID {{primaryKey.nameCamel}};
+    {{else}}
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "{{primaryKey.name}}", updatable = false, nullable = false)
+    private {{primaryKey.javaType}} {{primaryKey.nameCamel}};
+    {{/if}}
+
+    {{#each attributes}}
+    {{#unless isPk}}
+    @Column(name = "{{name}}"{{#if unique}}, unique = true{{/if}}{{#unless nullable}}, nullable = false{{/unless}})
+    private {{javaType}} {{nameCamel}};
+    {{/unless}}
+    {{/each}}
+}

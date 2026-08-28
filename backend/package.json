@@ -1,0 +1,23 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Servidor de colaboración y API para editor de diagramas",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "handlebars": "^4.7.9",
+    "ws": "^8.21.3",
+    "y-websocket": "^1.4.1",
+    "yjs": "^13.6.32"
+  }
+}

@@ -1,0 +1,56 @@
+package com.example.demo.service;
+
+import com.example.demo.dto.{{entityNamePascal}}DTO;
+import com.example.demo.entity.{{entityNamePascal}};
+import com.example.demo.repository.{{entityNamePascal}}Repository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.UUID;
+import java.time.LocalDate;
+import java.util.stream.Collectors;
+
+@Service
+public class {{entityNamePascal}}Service {
+
+    @Autowired
+    private {{entityNamePascal}}Repository repository;
+
+    public List<{{entityNamePascal}}DTO> findAll() {
+        return repository.findAll().stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    public {{entityNamePascal}}DTO findById({{primaryKey.javaType}} id) {
+        return repository.findById(id).map(this::toDTO).orElse(null);
+    }
+
+    public {{entityNamePascal}}DTO save({{entityNamePascal}}DTO dto) {
+        {{entityNamePascal}} entity = toEntity(dto);
+        return toDTO(repository.save(entity));
+    }
+
+    public void delete({{primaryKey.javaType}} id) {
+        repository.deleteById(id);
+    }
+
+    private {{entityNamePascal}}DTO toDTO({{entityNamePascal}} entity) {
+        {{entityNamePascal}}DTO dto = new {{entityNamePascal}}DTO();
+        dto.set{{primaryKey.namePascal}}(entity.get{{primaryKey.namePascal}}());
+        {{#each attributes}}
+        {{#unless isPk}}
+        dto.set{{namePascal}}(entity.get{{namePascal}}());
+        {{/unless}}
+        {{/each}}
+        return dto;
+    }
+
+    private {{entityNamePascal}} toEntity({{entityNamePascal}}DTO dto) {
+        {{entityNamePascal}} entity = new {{entityNamePascal}}();
+        {{#each attributes}}
+        {{#unless isPk}}
+        entity.set{{namePascal}}(dto.get{{namePascal}}());
+        {{/unless}}
+        {{/each}}
+        return entity;
+    }
+}

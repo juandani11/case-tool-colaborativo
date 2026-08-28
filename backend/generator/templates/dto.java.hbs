@@ -1,0 +1,30 @@
+package com.example.demo.dto;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.*;
+import lombok.*;
+import java.util.UUID;
+import java.time.LocalDate;
+import java.math.BigDecimal;
+
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+public class {{entityNamePascal}}DTO {
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private {{primaryKey.javaType}} {{primaryKey.nameCamel}};
+
+    {{#each attributes}}
+    {{#unless isPk}}
+    {{#unless nullable}}
+    @NotNull(message = "{{name}} es obligatorio")
+    {{/unless}}
+    {{#if isString}}
+    {{#unless nullable}}
+    @NotBlank(message = "{{name}} no puede estar vacío")
+    {{/unless}}
+    @Size(max = 255, message = "{{name}} no puede exceder 255 caracteres")
+    {{/if}}
+    private {{javaType}} {{nameCamel}};
+    {{/unless}}
+    {{/each}}
+}

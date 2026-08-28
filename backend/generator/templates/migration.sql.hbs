@@ -1,0 +1,7 @@
+{{#each entities}}
+CREATE TABLE IF NOT EXISTS {{{safeTableName entityNameCamel}}} (
+{{#each attributes}}
+    {{name}} {{#if isPk}}{{sqlPkType sqlType isUuid}}{{else}}{{sqlType}}{{/if}}{{#if isPk}} PRIMARY KEY{{/if}}{{#unless nullable}} NOT NULL{{/unless}}{{#if unique}} UNIQUE{{/if}}{{#unless @last}},{{/unless}}
+{{/each}}
+);
+{{/each}}

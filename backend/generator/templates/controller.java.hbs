@@ -1,0 +1,46 @@
+package com.example.demo.controller;
+
+import com.example.demo.dto.{{entityNamePascal}}DTO;
+import com.example.demo.service.{{entityNamePascal}}Service;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import java.util.UUID;
+import java.time.LocalDate;
+
+@RestController
+@RequestMapping("/api/{{pluralLowerCase entityName}}")
+public class {{entityNamePascal}}Controller {
+
+    @Autowired
+    private {{entityNamePascal}}Service service;
+
+    @GetMapping
+    public List<{{entityNamePascal}}DTO> getAll() {
+        return service.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public {{entityNamePascal}}DTO getById(@PathVariable {{primaryKey.javaType}} id) {
+        return service.findById(id);
+    }
+
+    @PostMapping
+    public ResponseEntity<{{entityNamePascal}}DTO> create(@Valid @RequestBody {{entityNamePascal}}DTO dto) {
+        return ResponseEntity.ok(service.save(dto));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<{{entityNamePascal}}DTO> update(@PathVariable {{primaryKey.javaType}} id, @Valid @RequestBody {{entityNamePascal}}DTO dto) {
+        dto.set{{primaryKey.namePascal}}(id);
+        return ResponseEntity.ok(service.save(dto));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable {{primaryKey.javaType}} id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}
