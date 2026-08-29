@@ -4,6 +4,8 @@ import com.example.demo.dto.{{entityNamePascal}}DTO;
 import com.example.demo.service.{{entityNamePascal}}Service;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -18,8 +20,13 @@ public class {{entityNamePascal}}Controller {
     private {{entityNamePascal}}Service service;
 
     @GetMapping
-    public List<{{entityNamePascal}}DTO> getAll() {
-        return service.findAll();
+    public ResponseEntity<Page<{{entityNamePascal}}DTO>> getAll(Pageable pageable) {
+        return ResponseEntity.ok(service.findAll(pageable));
+    }
+
+    @GetMapping("/all")
+    public List<{{entityNamePascal}}DTO> getAllNoPage() {
+        return service.findAllNoPage();
     }
 
     @GetMapping("/{id}")

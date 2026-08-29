@@ -1,7 +1,18 @@
 {{#each entities}}
 CREATE TABLE IF NOT EXISTS {{{safeTableName entityNameCamel}}} (
-{{#each attributes}}
+    {{#each attributes}}
     {{name}} {{#if isPk}}{{sqlPkType sqlType isUuid}}{{else}}{{sqlType}}{{/if}}{{#if isPk}} PRIMARY KEY{{/if}}{{#unless nullable}} NOT NULL{{/unless}}{{#if unique}} UNIQUE{{/if}}{{#unless @last}},{{/unless}}
-{{/each}}
+    {{/each}}
+    {{#each relations}}
+    {{#if eq jpaType "manyToOne"}}
+    , CONSTRAINT fk_{{entityNameCamel}}_{{name}}_{{otherEntityCamel}} FOREIGN KEY ({name}) REFERENCES {{otherEntityCamel}}({{primaryKey.name}})
+    {{/if}}
+    {{#if eq jpaType "oneToOne"}}
+    , CONSTRAINT fk_{{entityNameCamel}}_{{name}}_{{otherEntityCamel}} FOREIGN KEY ({name}) REFERENCES {{otherEntityCamel}}({{primaryKey.name}})
+    {{/if}}
+    {{#if eq jpaType "manyToMany"}}
+    -- Tabla intermedia para relación ManyToMany se creará manualmente o con migración separada
+    {{/if}}
+    {{/each}}
 );
 {{/each}}

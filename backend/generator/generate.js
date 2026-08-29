@@ -55,7 +55,7 @@ Handlebars.registerHelper('firstEntityName', (entities) => {
 
 Handlebars.registerHelper('eq', (a, b) => a === b);
 
-// NUEVO HELPER para el tipo SQL de la clave primaria
+// Helper para tipos SQL de clave primaria
 Handlebars.registerHelper('sqlPkType', (sqlType, isUuid) => {
   if (isUuid) return 'UUID';
   if (sqlType === 'INTEGER') return 'SERIAL';
@@ -79,6 +79,36 @@ Handlebars.registerHelper('safeTableName', (name) => {
     return `"${name}"`;
   }
   return name;
+});
+
+// Helper para determinar si una relación es ManyToMany
+Handlebars.registerHelper('isManyToMany', (cardFrom, cardTo) => {
+  return (cardFrom === 'N' || cardFrom === '*') && (cardTo === 'N' || cardTo === '*');
+});
+
+// Helper para determinar si es OneToMany
+Handlebars.registerHelper('isOneToMany', (cardFrom, cardTo) => {
+  return cardFrom === '1' && (cardTo === 'N' || cardTo === '*');
+});
+
+// Helper para determinar si es ManyToOne
+Handlebars.registerHelper('isManyToOne', (cardFrom, cardTo) => {
+  return (cardFrom === 'N' || cardFrom === '*') && cardTo === '1';
+});
+
+// Helper para determinar si es OneToOne
+Handlebars.registerHelper('isOneToOne', (cardFrom, cardTo) => {
+  return cardFrom === '1' && cardTo === '1';
+});
+
+// Helper para obtener el lado propietario
+Handlebars.registerHelper('isOwnerSide', (cardFrom) => {
+  return cardFrom === '1';
+});
+
+// Helper para el nombre del mappedBy (lado inverso)
+Handlebars.registerHelper('mappedByName', (entityName) => {
+  return entityName + 'Entities';
 });
 
 // Cargar plantillas (puede ser dinámico, como ya tenías)
@@ -123,6 +153,17 @@ function generateProject(ast) {
       const entities = ast.entities || [];
       const entityContexts = [];
 
+      // Construir un mapa de relaciones por entidad
+      const relationshipsMap = {};
+      const relationships = ast.relationships || [];
+      relationships.forEach(rel => {
+        const key = rel.source.entityName + '-' + rel.target.entityName;
+        if (!relationshipsMap[key]) {
+          relationshipsMap[key] = [];
+        }
+        relationshipsMap[key].push(rel);
+      });
+
       for (const entity of entities) {
         let primaryKeyAttr = entity.attributes.find(a => a.isPk);
         let primaryKey;
@@ -144,8 +185,60 @@ function generateProject(ast) {
             sqlType: 'BIGSERIAL',
             isUuid: false,
           };
-          // No añadimos atributo artificial aquí; se espera que el AST ya lo tenga
         }
+
+        // Obtener relaciones de esta entidad (como source y como target)
+        const relsAsSource = (relationshipsMap[entity.name] || []).filter(r => r.source.entityName === entity.name);
+        const relsAsTarget = (relationshipsMap[entity.name + '-'] || []).filter(r => r.target.entityName === entity.name);
+        // Note: the above assumes a specific format; let's adjust
+
+        // Better: collect all relationships where entity is source or target
+        const allRels = relationships.filter(r => r.source.entityName === entity.name || r.target.entityName === entity.name);
+
+        const relations = allRels.map(rel => {
+          const isSource = rel.source.entityName === entity.name;
+          const otherEntity = isSource ? rel.target.entityName : rel.source.entityName;
+          const otherIsSource = rel.source.entityName === otherEntity;
+          const otherEntityIsOther = !otherIsSource;
+
+          let jpaType = 'none';
+          let mappedBy = null;
+
+          // Determinar tipo JPA basado en cardinalidades
+          const cardFrom = rel.cardinalityFrom;
+          const cardTo = rel.cardinalityTo;
+
+          if (cardFrom === '1' && cardTo === '1') {
+            jpaType = 'oneToOne';
+          } else if ((cardFrom === 'N' || cardFrom === '*') && (cardTo === 'N' || cardTo === '*')) {
+            jpaType = 'manyToMany';
+          } else if (cardFrom === '1' && (cardTo === 'N' || cardTo === '*')) {
+            jpaType = 'oneToMany';
+          } else if ((cardFrom === 'N' || cardFrom === '*') && cardTo === '1') {
+            jpaType = 'manyToOne';
+          }
+
+          // Determinar mappedBy para el lado no propietario
+          if (jpaType === 'oneToMany') {
+            // El lado manyToOne tiene mappedBy pointing to the oneToMany side
+            mappedBy = isSource ? null : rel.source.entityName + 'Entities';
+          } else if (jpaType === 'manyToOne') {
+            mappedBy = isSource ? rel.target.entityName + 'Entities' : null;
+          }
+
+          return {
+            jpaType,
+            mappedBy,
+            otherEntity,
+            otherEntityPascal: Handlebars.helpers.pascalCase(otherEntity),
+            otherEntityCamel: Handlebars.helpers.camelCase(otherEntity),
+            relationshipType: rel.type,
+            cardinalityFrom: rel.cardinalityFrom,
+            cardinalityTo: rel.cardinalityTo,
+            isSource: isSource,
+            relationshipLabel: rel.label,
+          };
+        });
 
         const context = {
           entityName: entity.name,
@@ -160,10 +253,11 @@ function generateProject(ast) {
             javaType: getJavaType(attr.type),
             sqlType: getSqlType(attr.type),
             isPk: attr.isPk || false,
-            nullable: attr.nullable !== false, // true si es nullable
+            nullable: attr.nullable !== false,
             unique: attr.unique || false,
             isString: getJavaType(attr.type) === 'String',
           })),
+          relations: relations,  // NUEVO: información de relaciones para la plantilla
         };
         entityContexts.push(context);
 
