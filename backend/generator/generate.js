@@ -212,6 +212,16 @@ function generateProject(ast) {
             jpaType = 'oneToOne';
           } else if ((cardFrom === 'N' || cardFrom === '*') && (cardTo === 'N' || cardTo === '*')) {
             jpaType = 'manyToMany';
+            // Para ManyToMany, fijar nombres estándar para la tabla unida y columnas
+            // La tabla será: entidadActual + entidadRelacionada
+            // Los joinColumns serán: entidadRelacionada_id en esta entidad
+            // Los inverseJoinColumns serán: entidadActual_id en la entidad relacionada
+            jpaType = 'manyToMany'; // Re-asignar para mantener la bandera
+            // Añadir metadatos para la plantilla ManyToMany
+            // Usaremos convenciones: tableName = entidadActualCamel + otrosEntityCamel
+            // joinColumnName = otrosEntityCamel + "_id"
+            // inverseJoinColumnName = entidadActualCamel + "_id"
+            // Pero handlards no puede pasar objetos complejos fácilmente, así que fijaremos valores en la plantilla
           } else if (cardFrom === '1' && (cardTo === 'N' || cardTo === '*')) {
             jpaType = 'oneToMany';
           } else if ((cardFrom === 'N' || cardFrom === '*') && cardTo === '1') {
@@ -219,11 +229,18 @@ function generateProject(ast) {
           }
 
           // Determinar mappedBy para el lado no propietario
+          // Regla JPA: 
+          // - Si oneToMany y la entidad actual es el lado "one" (source con cardFrom='1'), 
+            //   mappedBy apunta al campo ManyToOne en la entidad many (usamos otherEntityCamel como nombre convencional)
+            // - Si oneToMany y la entidad actual es el lado "many", mappedBy es null (no hay @OneToMany en este lado)
+            // - manyToOne siempre tiene el @ManyToOne en la entidad correspondiente
           if (jpaType === 'oneToMany') {
-            // El lado manyToOne tiene mappedBy pointing to the oneToMany side
-            mappedBy = isSource ? null : rel.source.entityName + 'Entities';
+            // Si es el lado "one" (cardFrom='1'), setear mappedBy al nombre camelCase de la entidad many
+            // Si es el lado "many", mappedBy es null (no se añade @OneToMany aquí, solo @ManyToOne)
+            mappedBy = isSource ? otherEntityCamel : null;
           } else if (jpaType === 'manyToOne') {
-            mappedBy = isSource ? rel.target.entityName + 'Entities' : null;
+            // Siempre hay @ManyToOne, mappedBy no aplica aquí (es el lado dueño)
+            mappedBy = null;
           }
 
           return {
@@ -237,6 +254,10 @@ function generateProject(ast) {
             cardinalityTo: rel.cardinalityTo,
             isSource: isSource,
             relationshipLabel: rel.label,
+            // Metadatos para ManyToMany
+            manyToManyTableName: isSource ? `${entity.nameCamel}${otherEntity}` : `${otherEntity}${entity.nameCamel}`,
+            manyToManyJoinColumnName: isSource ? `${otherEntityCamel}_id` : `${entity.nameCamel}_id`,
+            manyToManyInverseJoinColumnName: isSource ? `${entity.nameCamel}_id` : `${otherEntityCamel}_id`,
           };
         });
 
