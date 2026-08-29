@@ -29,6 +29,30 @@ Handlebars.registerHelper('pluralLowerCase', (str) => {
   return plural.toLowerCase();
 });
 
+Handlebars.registerHelper('jsonExample', (entityContext) => {
+  const attrs = entityContext.attributes || [];
+  const fields = attrs
+    .filter(a => !a.isPk)
+    .map(a => {
+      let value;
+      if (a.javaType === 'String') value = `\"valor_${a.name}\"`;
+      else if (a.javaType === 'Integer' || a.javaType === 'Long') value = '1';
+      else if (a.javaType === 'BigDecimal') value = '9.99';
+      else if (a.javaType === 'Boolean') value = 'true';
+      else if (a.javaType === 'LocalDate') value = '\"2024-01-01\"';
+      else if (a.javaType === 'UUID') value = '\"00000000-0000-0000-0000-000000000000\"';
+      else value = '\"valor\"';
+      return `\"${a.name}\": ${value}`;
+    })
+    .join(', ');
+  return `{${fields}}`;
+});
+
+Handlebars.registerHelper('firstEntityName', (entities) => {
+  if (!entities || entities.length === 0) return '';
+  return entities[0].entityName;
+});
+
 Handlebars.registerHelper('eq', (a, b) => a === b);
 
 // NUEVO HELPER para el tipo SQL de la clave primaria

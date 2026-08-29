@@ -1,4 +1,4 @@
-# {{projectName}}
+# generated-backend
 
 Backend generado automáticamente a partir de un diagrama de entidades (AST). Basado en **Spring Boot 4.0.0**, **Java 21**, **PostgreSQL 18**, **Spring Security 7**, **JPA/Hibernate** y **JWT**.
 
@@ -87,7 +87,7 @@ Respuesta:
 Incluye el token en el header `Authorization` de cada petición protegida:
 
 ```bash
-curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entities)}} \
+curl -X GET http://localhost:8080/api/entityas \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -95,23 +95,48 @@ curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entitie
 
 ## Endpoints Disponibles
 
-{{#each entities}}
-### {{entityNamePascal}}
+### EntityA
 
 | Método | URL | Descripción |
 |--------|-----|-------------|
-| GET    | `/api/{{pluralLowerCase entityName}}` | Listar todos los registros |
-| GET    | `/api/{{pluralLowerCase entityName}}/{id}` | Obtener por ID |
-| POST   | `/api/{{pluralLowerCase entityName}}` | Crear nuevo registro |
-| PUT    | `/api/{{pluralLowerCase entityName}}/{id}` | Actualizar registro |
-| DELETE | `/api/{{pluralLowerCase entityName}}/{id}` | Eliminar registro |
+| GET    | `/api/entityas` | Listar todos los registros |
+| GET    | `/api/entityas/{id}` | Obtener por ID |
+| POST   | `/api/entityas` | Crear nuevo registro |
+| PUT    | `/api/entityas/{id}` | Actualizar registro |
+| DELETE | `/api/entityas/{id}` | Eliminar registro |
 
 **Campos del DTO:**
-{{#each attributes}}
-- `{{name}}` ({{javaType}}){{#if isPk}} — Clave primaria (autogenerada){{/if}}
-{{/each}}
+- `id` (UUID) — Clave primaria (autogenerada)
+- `name` (String)
 
-{{/each}}
+### EntityB
+
+| Método | URL | Descripción |
+|--------|-----|-------------|
+| GET    | `/api/entitybs` | Listar todos los registros |
+| GET    | `/api/entitybs/{id}` | Obtener por ID |
+| POST   | `/api/entitybs` | Crear nuevo registro |
+| PUT    | `/api/entitybs/{id}` | Actualizar registro |
+| DELETE | `/api/entitybs/{id}` | Eliminar registro |
+
+**Campos del DTO:**
+- `id` (UUID) — Clave primaria (autogenerada)
+- `name` (String)
+
+### EntityC
+
+| Método | URL | Descripción |
+|--------|-----|-------------|
+| GET    | `/api/entitycs` | Listar todos los registros |
+| GET    | `/api/entitycs/{id}` | Obtener por ID |
+| POST   | `/api/entitycs` | Crear nuevo registro |
+| PUT    | `/api/entitycs/{id}` | Actualizar registro |
+| DELETE | `/api/entitycs/{id}` | Eliminar registro |
+
+**Campos del DTO:**
+- `id` (UUID) — Clave primaria (autogenerada)
+- `name` (String)
+
 
 ---
 
@@ -176,33 +201,81 @@ $token = $response.token
 Write-Output "Token: $token"
 ```
 
-{{#each entities}}
-### {{entityNamePascal}} (`/api/{{pluralLowerCase entityName}}`)
+### EntityA (`/api/entityas`)
 
 ```bash
 # Listar
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entityas
 
 # Crear
-curl -X POST http://localhost:8080/api/{{pluralLowerCase entityName}} \
+curl -X POST http://localhost:8080/api/entityas \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{{{jsonExample this}}}'
+  -d '{"name": "valor_name"}'
 
 # Obtener por ID
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<id>
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entityas/<id>
 
 # Actualizar
-curl -X PUT http://localhost:8080/api/{{pluralLowerCase entityName}}/<id> \
+curl -X PUT http://localhost:8080/api/entityas/<id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{{{jsonExample this}}}'
+  -d '{"name": "valor_name"}'
 
 # Eliminar
-curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<id>
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entityas/<id>
 ```
 
-{{/each}}
+### EntityB (`/api/entitybs`)
+
+```bash
+# Listar
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entitybs
+
+# Crear
+curl -X POST http://localhost:8080/api/entitybs \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "valor_name"}'
+
+# Obtener por ID
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entitybs/<id>
+
+# Actualizar
+curl -X PUT http://localhost:8080/api/entitybs/<id> \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "valor_name"}'
+
+# Eliminar
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entitybs/<id>
+```
+
+### EntityC (`/api/entitycs`)
+
+```bash
+# Listar
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entitycs
+
+# Crear
+curl -X POST http://localhost:8080/api/entitycs \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "valor_name"}'
+
+# Obtener por ID
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entitycs/<id>
+
+# Actualizar
+curl -X PUT http://localhost:8080/api/entitycs/<id> \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "valor_name"}'
+
+# Eliminar
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entitycs/<id>
+```
+
 
 ---
 
