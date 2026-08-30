@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+         xmlns:uml="http://www.omg.org/spec/UML/20131001"
+         xmi:version="2.5.1">
+
+  <uml:Model xmi:id="ModeloPrincipal" name="ModeloEjemplo" visibility="public">
+
+    <!-- Tipos de datos -->
+    <packagedElement xmi:type="uml:DataType" xmi:id="DT_String" name="String"/>
+    <packagedElement xmi:type="uml:DataType" xmi:id="DT_Integer" name="Integer"/>
+    <packagedElement xmi:type="uml:DataType" xmi:id="DT_Double" name="Double"/>
+    <packagedElement xmi:type="uml:DataType" xmi:id="DT_Boolean" name="Boolean"/>
+
+    <!-- Clase Persona (abstracta) -->
+    <packagedElement xmi:type="uml:Class" xmi:id="C_Persona" name="Persona" visibility="public" isAbstract="true">
+      <ownedAttribute xmi:id="A_Per_nombre" name="nombre" visibility="private" type="DT_String"/>
+      <ownedAttribute xmi:id="A_Per_edad" name="edad" visibility="private" type="DT_Integer"/>
+      <ownedOperation xmi:id="O_Per_getNombre" name="getNombre" visibility="public">
+        <ownedParameter xmi:id="P_Per_getNombre_ret" direction="return" type="DT_String"/>
+      </ownedOperation>
+      <ownedOperation xmi:id="O_Per_setEdad" name="setEdad" visibility="public">
+        <ownedParameter xmi:id="P_Per_setEdad_param" name="edad" direction="in" type="DT_Integer"/>
+      </ownedOperation>
+      <ownedOperation xmi:id="O_Per_esMayor" name="esMayorEdad" visibility="public">
+        <ownedParameter xmi:id="P_Per_esMayor_ret" direction="return" type="DT_Boolean"/>
+      </ownedOperation>
+    </packagedElement>
+
+    <!-- Clase Empleado -->
+    <packagedElement xmi:type="uml:Class" xmi:id="C_Empleado" name="Empleado" visibility="public">
+      <ownedAttribute xmi:id="A_Emp_salario" name="salario" visibility="private" type="DT_Double"/>
+      <ownedAttribute xmi:id="A_Emp_cargo" name="cargo" visibility="private" type="DT_String"/>
+      <ownedOperation xmi:id="O_Emp_calcularPago" name="calcularPago" visibility="public">
+        <ownedParameter xmi:id="P_Emp_calcularPago_ret" direction="return" type="DT_Double"/>
+      </ownedOperation>
+      <ownedOperation xmi:id="O_Emp_calcularCarga" name="calcularCargaHoras" visibility="public">
+        <ownedParameter xmi:id="P_Emp_calcularCarga_param" name="proyecto" direction="in" type="C_Proyecto"/>
+        <ownedParameter xmi:id="P_Emp_calcularCarga_ret" direction="return" type="DT_Integer"/>
+      </ownedOperation>
+    </packagedElement>
+
+    <!-- Clase Departamento -->
+    <packagedElement xmi:type="uml:Class" xmi:id="C_Departamento" name="Departamento" visibility="public">
+      <ownedAttribute xmi:id="A_Dep_codigo" name="codigo" visibility="private" type="DT_String"/>
+      <ownedAttribute xmi:id="A_Dep_nombre" name="nombre" visibility="private" type="DT_String"/>
+      <ownedOperation xmi:id="O_Dep_agregar" name="agregarEmpleado" visibility="public">
+        <ownedParameter xmi:id="P_Dep_agregar_param" name="empleado" direction="in" type="C_Empleado"/>
+      </ownedOperation>
+      <ownedOperation xmi:id="O_Dep_listarEmpleados" name="listarEmpleados" visibility="public">
+        <ownedParameter xmi:id="P_Dep_listar_ret" direction="return" type="DT_String"/>
+      </ownedOperation>
+    </packagedElement>
+
+    <!-- Clase Proyecto -->
+    <packagedElement xmi:type="uml:Class" xmi:id="C_Proyecto" name="Proyecto" visibility="public">
+      <ownedAttribute xmi:id="A_Pro_nombre" name="nombreProyecto" visibility="private" type="DT_String"/>
+      <ownedAttribute xmi:id="A_Pro_presupuesto" name="presupuesto" visibility="private" type="DT_Double"/>
+      <ownedOperation xmi:id="O_Pro_asignar" name="asignarEmpleado" visibility="public">
+        <ownedParameter xmi:id="P_Pro_asignar_param" name="empleado" direction="in" type="C_Empleado"/>
+      </ownedOperation>
+      <ownedOperation xmi:id="O_Pro_obtenerCosto" name="obtenerCostoTotal" visibility="public">
+        <ownedParameter xmi:id="P_Pro_obtenerCosto_ret" direction="return" type="DT_Double"/>
+      </ownedOperation>
+    </packagedElement>
+
+    <!-- Interfaz IReportable -->
+    <packagedElement xmi:type="uml:Interface" xmi:id="I_Reportable" name="IReportable" visibility="public">
+      <ownedOperation xmi:id="O_Rep_generarReporte" name="generarReporte" visibility="public">
+        <ownedParameter xmi:id="P_Rep_generarReporte_ret" direction="return" type="DT_String"/>
+      </ownedOperation>
+    </packagedElement>
+
+    <!-- Generalización Empleado -> Persona -->
+    <packagedElement xmi:type="uml:Generalization" xmi:id="Gen_Emp_Per" specific="C_Empleado" general="C_Persona"/>
+
+    <!-- Realización Empleado -> IReportable -->
+    <packagedElement xmi:type="uml:InterfaceRealization" xmi:id="Real_Emp_Rep" client="C_Empleado" supplier="I_Reportable"/>
+
+    <!-- Composición Departamento 1 -> 1..* Empleado -->
+    <packagedElement xmi:type="uml:Association" xmi:id="Ass_Dep_Emp" name="tiene" visibility="public">
+      <ownedEnd xmi:id="E_Dep_Emp_dep" type="C_Departamento" aggregation="none">
+        <lowerValue xmi:id="LV_Dep_Emp_dep" xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:id="UV_Dep_Emp_dep" xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="E_Dep_Emp_emp" type="C_Empleado" aggregation="composite">
+        <lowerValue xmi:id="LV_Dep_Emp_emp" xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:id="UV_Dep_Emp_emp" xmi:type="uml:LiteralUnlimitedNatural" value="*"/>
+      </ownedEnd>
+    </packagedElement>
+
+    <!-- Agregación Proyecto 0..* -> 1..* Empleado -->
+    <packagedElement xmi:type="uml:Association" xmi:id="Ass_Pro_Emp" name="asigna" visibility="public">
+      <ownedEnd xmi:id="E_Pro_Emp_pro" type="C_Proyecto" aggregation="shared">
+        <lowerValue xmi:id="LV_Pro_Emp_pro" xmi:type="uml:LiteralInteger" value="0"/>
+        <upperValue xmi:id="UV_Pro_Emp_pro" xmi:type="uml:LiteralUnlimitedNatural" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="E_Pro_Emp_emp" type="C_Empleado" aggregation="none">
+        <lowerValue xmi:id="LV_Pro_Emp_emp" xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:id="UV_Pro_Emp_emp" xmi:type="uml:LiteralUnlimitedNatural" value="*"/>
+      </ownedEnd>
+    </packagedElement>
+
+    <!-- Asociación simple Empleado 0..1 -> 1 Departamento -->
+    <packagedElement xmi:type="uml:Association" xmi:id="Ass_Emp_Dep" name="pertenece" visibility="public">
+      <ownedEnd xmi:id="E_Emp_Dep_emp" type="C_Empleado" aggregation="none">
+        <lowerValue xmi:id="LV_Emp_Dep_emp" xmi:type="uml:LiteralInteger" value="0"/>
+        <upperValue xmi:id="UV_Emp_Dep_emp" xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="E_Emp_Dep_dep" type="C_Departamento" aggregation="none">
+        <lowerValue xmi:id="LV_Emp_Dep_dep" xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:id="UV_Emp_Dep_dep" xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+
+    <!-- Dependencia Empleado -> Proyecto -->
+    <packagedElement xmi:type="uml:Dependency" xmi:id="Dep_Emp_Pro" client="C_Empleado" supplier="C_Proyecto"/>
+
+  </uml:Model>
+</xmi:XMI>

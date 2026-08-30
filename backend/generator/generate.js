@@ -116,6 +116,7 @@ const templates = {
   'aiQueryResponse': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'AiQueryResponse.java.hbs'), 'utf8')),
   'aiQueryService': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'AiQueryService.java.hbs'), 'utf8')),
   'aiController': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'AiController.java.hbs'), 'utf8')),
+  'intentClassifier': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'IntentClassifier.java.hbs'), 'utf8')),
 };
 
 // ── Core generation ─────────────────────────────────────────────────
@@ -395,6 +396,7 @@ function generateProject(ast) {
       const entityNamesStr = entityContexts.map(e => `"${e.entityNamePascal}"`).join(', ');
       writeFile(`${BASE_PATH}/ai/AiQueryRequest.java`, templates['aiQueryRequest']({}));
       writeFile(`${BASE_PATH}/ai/AiQueryResponse.java`, templates['aiQueryResponse']({}));
+      writeFile(`${BASE_PATH}/ai/IntentClassifier.java`, templates['intentClassifier']({}));
       writeFile(`${BASE_PATH}/ai/AiQueryService.java`, templates['aiQueryService']({ entityNames: entityNamesStr }));
       writeFile(`${BASE_PATH}/ai/AiController.java`, templates['aiController']({}));
 

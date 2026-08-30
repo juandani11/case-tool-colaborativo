@@ -86,7 +86,7 @@ Respuesta:
 Incluye el token en el header `Authorization` de cada peticion protegida:
 
 ```bash
-curl -X GET http://localhost:8080/api/users \
+curl -X GET http://localhost:8080/api/clientes \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -102,69 +102,71 @@ curl -X GET http://localhost:8080/api/users \
 
 ## Endpoints Disponibles
 
-### User
+### Cliente
 
 | Metodo | URL | Descripcion |
 |--------|-----|-------------|
-| GET    | `/api/users` | Listar todos (paginado) |
-| GET    | `/api/users/all` | Listar todos (sin paginacion) |
-| GET    | `/api/users/{id}` | Obtener por ID |
-| POST   | `/api/users` | Crear nuevo registro |
-| PUT    | `/api/users/{id}` | Actualizar registro |
-| DELETE | `/api/users/{id}` | Eliminar registro |
+| GET    | `/api/clientes` | Listar todos (paginado) |
+| GET    | `/api/clientes/all` | Listar todos (sin paginacion) |
+| GET    | `/api/clientes/{id}` | Obtener por ID |
+| POST   | `/api/clientes` | Crear nuevo registro |
+| PUT    | `/api/clientes/{id}` | Actualizar registro |
+| DELETE | `/api/clientes/{id}` | Eliminar registro |
 
 **Campos del DTO:**
 - `id` (UUID) — Clave primaria (autogenerada)
-- `username` (String) — Obligatorio
+- `nombre` (String) — Obligatorio
 - `email` (String) — Obligatorio
-- `createdAt` (LocalDate) — Obligatorio
+- `fechaRegistro` (LocalDate) — Obligatorio
 
-### Order
-
-| Metodo | URL | Descripcion |
-|--------|-----|-------------|
-| GET    | `/api/orders` | Listar todos (paginado) |
-| GET    | `/api/orders/all` | Listar todos (sin paginacion) |
-| GET    | `/api/orders/{id}` | Obtener por ID |
-| POST   | `/api/orders` | Crear nuevo registro |
-| PUT    | `/api/orders/{id}` | Actualizar registro |
-| DELETE | `/api/orders/{id}` | Eliminar registro |
-
-**Campos del DTO:**
-- `id` (UUID) — Clave primaria (autogenerada)
-- `orderDate` (LocalDate) — Obligatorio
-- `totalAmount` (BigDecimal) — Obligatorio
-
-### Product
+### Pedido
 
 | Metodo | URL | Descripcion |
 |--------|-----|-------------|
-| GET    | `/api/products` | Listar todos (paginado) |
-| GET    | `/api/products/all` | Listar todos (sin paginacion) |
-| GET    | `/api/products/{id}` | Obtener por ID |
-| POST   | `/api/products` | Crear nuevo registro |
-| PUT    | `/api/products/{id}` | Actualizar registro |
-| DELETE | `/api/products/{id}` | Eliminar registro |
+| GET    | `/api/pedidos` | Listar todos (paginado) |
+| GET    | `/api/pedidos/all` | Listar todos (sin paginacion) |
+| GET    | `/api/pedidos/{id}` | Obtener por ID |
+| POST   | `/api/pedidos` | Crear nuevo registro |
+| PUT    | `/api/pedidos/{id}` | Actualizar registro |
+| DELETE | `/api/pedidos/{id}` | Eliminar registro |
 
 **Campos del DTO:**
 - `id` (UUID) — Clave primaria (autogenerada)
-- `name` (String) — Obligatorio
-- `price` (BigDecimal) — Obligatorio
+- `fechaPedido` (LocalDate) — Obligatorio
+- `total` (BigDecimal) — Obligatorio
 
-### Category
+### Producto
 
 | Metodo | URL | Descripcion |
 |--------|-----|-------------|
-| GET    | `/api/categories` | Listar todos (paginado) |
-| GET    | `/api/categories/all` | Listar todos (sin paginacion) |
-| GET    | `/api/categories/{id}` | Obtener por ID |
-| POST   | `/api/categories` | Crear nuevo registro |
-| PUT    | `/api/categories/{id}` | Actualizar registro |
-| DELETE | `/api/categories/{id}` | Eliminar registro |
+| GET    | `/api/productos` | Listar todos (paginado) |
+| GET    | `/api/productos/all` | Listar todos (sin paginacion) |
+| GET    | `/api/productos/{id}` | Obtener por ID |
+| POST   | `/api/productos` | Crear nuevo registro |
+| PUT    | `/api/productos/{id}` | Actualizar registro |
+| DELETE | `/api/productos/{id}` | Eliminar registro |
 
 **Campos del DTO:**
 - `id` (UUID) — Clave primaria (autogenerada)
-- `name` (String) — Obligatorio
+- `nombre` (String) — Obligatorio
+- `precio` (BigDecimal) — Obligatorio
+- `stock` (Integer) — Obligatorio
+
+### Factura
+
+| Metodo | URL | Descripcion |
+|--------|-----|-------------|
+| GET    | `/api/facturas` | Listar todos (paginado) |
+| GET    | `/api/facturas/all` | Listar todos (sin paginacion) |
+| GET    | `/api/facturas/{id}` | Obtener por ID |
+| POST   | `/api/facturas` | Crear nuevo registro |
+| PUT    | `/api/facturas/{id}` | Actualizar registro |
+| DELETE | `/api/facturas/{id}` | Eliminar registro |
+
+**Campos del DTO:**
+- `id` (UUID) — Clave primaria (autogenerada)
+- `fechaFactura` (LocalDate) — Obligatorio
+- `monto` (BigDecimal) — Obligatorio
 
 
 ---
@@ -180,22 +182,32 @@ curl -X GET http://localhost:8080/api/users \
 
 ## IA Local (Motor de Reglas)
 
-El backend incluye un endpoint de IA local que no requiere internet. Usa un motor de reglas simple en Java puro.
+El backend incluye un endpoint de IA local basado en un motor de reglas simple, sin dependencias externas. Funciona 100% offline.
 
-### Endpoint
+### Como funciona
+
+1. **AiQueryService** analiza la consulta del usuario con coincidencia de keywords.
+2. Detecta la intencion (saludo, listar entidades, ayuda, etc.) y genera una respuesta contextual.
+3. Usa los nombres de entidades del diagrama para personalizar las respuestas.
+
+### Endpoints
 
 | Metodo | URL | Descripcion |
 |--------|-----|-------------|
 | POST | `/api/ai/query` | Enviar consulta en lenguaje natural |
 
-### Comandos Soportados
+### Intenciones Soportadas
 
-| Comando | Ejemplo | Respuesta |
-|---------|---------|-----------|
-| Saludo | "hola", "buenos dias" | Saludo amigable |
-| Entidades | "entidades", "listar entidades" | Lista las entidades del sistema |
+| Intencion | Ejemplo | Respuesta |
+|-----------|---------|-----------|
+| Saludo | "hola", "buenos dias" | Saludo amigable y presentacion |
+| Listar entidades | "entidades", "que hay" | Lista las entidades del sistema |
 | Ayuda | "ayuda", "help" | Muestra comandos disponibles |
-| Crear | "crear registro", "nuevo" | Instrucciones para crear registros |
+| Crear registro | "crear", "nuevo" | Instrucciones POST con ejemplos |
+| Consultar registro | "buscar", "ver detalle" | Instrucciones GET por ID |
+| Eliminar registro | "eliminar", "borrar" | Instrucciones DELETE |
+| Estadisticas | "cuantos", "metricas" | Metricas del sistema |
+| Desconocido | (cualquier otra cosa) | Mensaje de ayuda con sugerencias |
 
 ### Ejemplo de Uso (Bash)
 
@@ -205,17 +217,29 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['token'])")
 
-# Consulta: hola
+# Saludo
 curl -X POST http://localhost:8080/api/ai/query \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query": "hola"}'
 
-# Consulta: entidades
+# Listar entidades
 curl -X POST http://localhost:8080/api/ai/query \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query": "listar entidades"}'
+
+# Ayuda
+curl -X POST http://localhost:8080/api/ai/query \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "ayuda"}'
+
+# Crear registro
+curl -X POST http://localhost:8080/api/ai/query \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "crear registro"}'
 ```
 
 ### Ejemplo de Uso (PowerShell)
@@ -223,6 +247,15 @@ curl -X POST http://localhost:8080/api/ai/query \
 ```powershell
 $body = @{ query = "hola" } | ConvertTo-Json
 Invoke-RestMethod -Uri "http://localhost:8080/api/ai/query" -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $token" }
+```
+
+### Arquitectura IA
+
+```
+ai/
+├── AiQueryService.java      # Motor de reglas + logica de negocio
+├── AiController.java        # Endpoint REST
+└── AiQueryRequest.java      # DTO de entrada
 ```
 
 ---
@@ -274,116 +307,116 @@ Write-Output "Token: $token"
 
 > **Nota:** Los IDs en los ejemplos usan `<uuid>` como placeholder. Reemplazalo con el UUID real al probar.
 
-### User (`/api/users`)
+### Cliente (`/api/clientes`)
 
 ```bash
 # Listar (paginado)
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/users
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/clientes
 
 # Listar todos
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/users/all
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/clientes/all
 
 # Crear
-curl -X POST http://localhost:8080/api/users \
+curl -X POST http://localhost:8080/api/clientes \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"username": "valor_username", "email": "valor_email", "createdAt": "2024-01-01"}'
+  -d '{"nombre": "valor_nombre", "email": "valor_email", "fechaRegistro": "2024-01-01"}'
 
 # Obtener por ID
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/users/<uuid>
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/clientes/<uuid>
 
 # Actualizar
-curl -X PUT http://localhost:8080/api/users/<uuid> \
+curl -X PUT http://localhost:8080/api/clientes/<uuid> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"username": "valor_username", "email": "valor_email", "createdAt": "2024-01-01"}'
+  -d '{"nombre": "valor_nombre", "email": "valor_email", "fechaRegistro": "2024-01-01"}'
 
 # Eliminar
-curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/users/<uuid>
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/clientes/<uuid>
 ```
 
-### Order (`/api/orders`)
+### Pedido (`/api/pedidos`)
 
 ```bash
 # Listar (paginado)
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/orders
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/pedidos
 
 # Listar todos
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/orders/all
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/pedidos/all
 
 # Crear
-curl -X POST http://localhost:8080/api/orders \
+curl -X POST http://localhost:8080/api/pedidos \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"orderDate": "2024-01-01", "totalAmount": 9.99}'
+  -d '{"fechaPedido": "2024-01-01", "total": 9.99}'
 
 # Obtener por ID
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/orders/<uuid>
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/pedidos/<uuid>
 
 # Actualizar
-curl -X PUT http://localhost:8080/api/orders/<uuid> \
+curl -X PUT http://localhost:8080/api/pedidos/<uuid> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"orderDate": "2024-01-01", "totalAmount": 9.99}'
+  -d '{"fechaPedido": "2024-01-01", "total": 9.99}'
 
 # Eliminar
-curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/orders/<uuid>
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/pedidos/<uuid>
 ```
 
-### Product (`/api/products`)
+### Producto (`/api/productos`)
 
 ```bash
 # Listar (paginado)
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/products
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/productos
 
 # Listar todos
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/products/all
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/productos/all
 
 # Crear
-curl -X POST http://localhost:8080/api/products \
+curl -X POST http://localhost:8080/api/productos \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "valor_name", "price": 9.99}'
+  -d '{"nombre": "valor_nombre", "precio": 9.99, "stock": 1}'
 
 # Obtener por ID
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/products/<uuid>
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/productos/<uuid>
 
 # Actualizar
-curl -X PUT http://localhost:8080/api/products/<uuid> \
+curl -X PUT http://localhost:8080/api/productos/<uuid> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "valor_name", "price": 9.99}'
+  -d '{"nombre": "valor_nombre", "precio": 9.99, "stock": 1}'
 
 # Eliminar
-curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/products/<uuid>
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/productos/<uuid>
 ```
 
-### Category (`/api/categories`)
+### Factura (`/api/facturas`)
 
 ```bash
 # Listar (paginado)
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/categories
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/facturas
 
 # Listar todos
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/categories/all
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/facturas/all
 
 # Crear
-curl -X POST http://localhost:8080/api/categories \
+curl -X POST http://localhost:8080/api/facturas \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "valor_name"}'
+  -d '{"fechaFactura": "2024-01-01", "monto": 9.99}'
 
 # Obtener por ID
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/categories/<uuid>
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/facturas/<uuid>
 
 # Actualizar
-curl -X PUT http://localhost:8080/api/categories/<uuid> \
+curl -X PUT http://localhost:8080/api/facturas/<uuid> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "valor_name"}'
+  -d '{"fechaFactura": "2024-01-01", "monto": 9.99}'
 
 # Eliminar
-curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/categories/<uuid>
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/facturas/<uuid>
 ```
 
 

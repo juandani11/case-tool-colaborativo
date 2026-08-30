@@ -1,83 +1,121 @@
 package com.example.demo.ai;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class AiQueryService {
 
-    private static final List<String> ENTITIES = List.of("User", "Order", "Product", "Category");
+    private final IntentClassifier intentClassifier;
+    private final List<String> entityNames;
 
-    private static final String HELP_TEXT = "Comandos soportados:\n" +
-        "  - 'hola', 'buenos dias', etc. -> Saludo\n" +
-        "  - 'entidades', 'listar entidades' -> Lista las entidades del sistema\n" +
-        "  - 'ayuda', 'help' -> Muestra esta ayuda\n" +
-        "  - 'crear registro', 'nuevo' -> Instrucciones para crear registros\n" +
-        "  - Cualquier otra consulta -> Respuesta generica";
+    @Autowired
+    public AiQueryService(IntentClassifier intentClassifier) {
+        this.intentClassifier = intentClassifier;
+        this.entityNames = Arrays.asList("Cliente", "Pedido", "Producto", "Factura");
+    }
 
     public AiQueryResponse process(String input) {
         if (input == null || input.isBlank()) {
-            return new AiQueryResponse("Por favor, escribe algo para que pueda ayudarte.");
+            return new AiQueryResponse("Por favor, escribe algo para que pueda ayudarte.", "vacio");
         }
 
-        String lower = input.trim().toLowerCase();
+        String intent = intentClassifier.classify(input);
+        String modelStatus = intentClassifier.isModelAvailable()
+            ? "[Motor: embeddings local]"
+            : "[Motor: keyword fallback]";
 
-        // Greetings
-        if (lower.contains("hola") || lower.contains("buenos dias") ||
-            lower.contains("buenas tardes") || lower.contains("buenas noches") ||
-            lower.contains("hey") || lower.contains("saludos")) {
-            return new AiQueryResponse("Hola! Soy el asistente de este backend. Puedo ayudarte a conocer las entidades disponibles o explicarte como usar la API. Escribe 'ayuda' para ver los comandos.");
+        System.out.println("[AiQueryService] Intent detectado: " + intent + " " + modelStatus);
+
+        switch (intent) {
+            case "saludo":
+                return new AiQueryResponse(
+                    "Hola! Soy el asistente de este backend.\n\n" +
+                    "Puedo ayudarte a:\n" +
+                    "  - Conocer las entidades disponibles\n" +
+                    "  - Explicarte como usar la API\n" +
+                    "  - Guiarte para crear, buscar o eliminar registros\n\n" +
+                    "Escribe 'ayuda' para ver todos los comandos.",
+                    intent);
+            case "listar_entidades":
+                String entityList = entityNames.stream()
+                    .map(e -> "  - " + e + " -> /api/" + e.toLowerCase() + "s")
+                    .collect(Collectors.joining("\n"));
+                return new AiQueryResponse(
+                    "Entidades disponibles en el sistema (" + entityNames.size() + "):\n" +
+                    entityList + "\n\n" +
+                    "Para listar registros: GET /api/<entidad>\n" +
+                    "Para crear registros: POST /api/<entidad>",
+                    intent);
+            case "ayuda":
+                String entities = entityNames.stream()
+                    .map(e -> "  - " + e)
+                    .collect(Collectors.joining("\n"));
+                return new AiQueryResponse(
+                    "Comandos soportados:\n" +
+                    "  - 'hola', 'buenos dias', etc. -> Saludo\n" +
+                    "  - 'entidades', 'listar entidades' -> Lista las entidades del sistema\n" +
+                    "  - 'ayuda', 'help' -> Muestra esta ayuda\n" +
+                    "  - 'crear registro', 'nuevo' -> Instrucciones para crear registros\n" +
+                    "  - 'buscar', 'ver detalle' -> Consultar un registro\n" +
+                    "  - 'eliminar', 'borrar' -> Eliminar un registro\n" +
+                    "  - 'estadisticas', 'cuantos' -> Metricas del sistema\n\n" +
+                    "Entidades del sistema:\n" + entities,
+                    intent);
+            case "crear_registro":
+                StringBuilder sb = new StringBuilder("Para crear un registro, usa el endpoint POST correspondiente:\n\n");
+                for (String entity : entityNames) {
+                    sb.append("  POST /api/").append(entity.toLowerCase()).append("s\n");
+                    sb.append("  Body: { \"campo\": \"valor\", ... }\n\n");
+                }
+                sb.append("Ejemplo con curl:\n");
+                sb.append("  curl -X POST http://localhost:8080/api/").append(entityNames.get(0).toLowerCase()).append("s \\\n");
+                sb.append("    -H \"Authorization: Bearer <token>\" \\\n");
+                sb.append("    -H \"Content-Type: application/json\" \\\n");
+                sb.append("    -d '{ \"nombre\": \"ejemplo\" }'");
+                return new AiQueryResponse(sb.toString(), intent);
+            case "consultar_registro":
+                StringBuilder sb2 = new StringBuilder("Para consultar un registro, usa GET con el ID:\n\n");
+                for (String entity : entityNames) {
+                    sb2.append("  GET /api/").append(entity.toLowerCase()).append("s/{id}\n");
+                }
+                sb2.append("\nEjemplo con curl:\n");
+                sb2.append("  curl -H \"Authorization: Bearer <token>\" \\\n");
+                sb2.append("    http://localhost:8080/api/").append(entityNames.get(0).toLowerCase()).append("s/{id}");
+                return new AiQueryResponse(sb2.toString(), intent);
+            case "eliminar_registro":
+                StringBuilder sb3 = new StringBuilder("Para eliminar un registro, usa DELETE con el ID:\n\n");
+                for (String entity : entityNames) {
+                    sb3.append("  DELETE /api/").append(entity.toLowerCase()).append("s/{id}\n");
+                }
+                sb3.append("\nEjemplo con curl:\n");
+                sb3.append("  curl -X DELETE -H \"Authorization: Bearer <token>\" \\\n");
+                sb3.append("    http://localhost:8080/api/").append(entityNames.get(0).toLowerCase()).append("s/{id}");
+                return new AiQueryResponse(sb3.toString(), intent);
+            case "estadisticas":
+                StringBuilder sb4 = new StringBuilder("Estadisticas del sistema:\n\n");
+                sb4.append("  Entidades definidas: ").append(entityNames.size()).append("\n");
+                sb4.append("  Endpoints disponibles: ").append(entityNames.size() * 6).append(" (6 por entidad)\n\n");
+                sb4.append("Entidades:\n");
+                for (String entity : entityNames) {
+                    sb4.append("  - ").append(entity).append("\n");
+                }
+                return new AiQueryResponse(sb4.toString(), intent);
+            default:
+                return new AiQueryResponse(
+                    "No entendi tu consulta: \"" + input + "\"\n\n" +
+                    "Intenta con:\n" +
+                    "  - 'hola' para un saludo\n" +
+                    "  - 'entidades' para ver las entidades disponibles\n" +
+                    "  - 'ayuda' para ver los comandos soportados\n" +
+                    "  - 'crear registro' para instrucciones de creacion\n" +
+                    "  - 'buscar' para consultar un registro\n" +
+                    "  - 'estadisticas' para metricas del sistema",
+                    intent);
         }
-
-        // List entities
-        if (lower.contains("entidad") || lower.contains("entidades") || lower.contains("listar")) {
-            String entityList = ENTITIES.stream()
-                .map(e -> "  - " + e + " -> /api/" + e.toLowerCase() + "s")
-                .collect(Collectors.joining("\n"));
-            return new AiQueryResponse(
-                "Entidades disponibles en el sistema (" + ENTITIES.size() + "):\n" +
-                entityList + "\n\n" +
-                "Para listar registros: GET /api/<entidad>\n" +
-                "Para crear registros: POST /api/<entidad>"
-            );
-        }
-
-        // Help
-        if (lower.contains("ayuda") || lower.contains("help") || lower.contains("comando")) {
-            String entityList = ENTITIES.stream()
-                .map(e -> "  - " + e)
-                .collect(Collectors.joining("\n"));
-            return new AiQueryResponse(
-                HELP_TEXT + "\n\n" +
-                "Entidades del sistema:\n" + entityList
-            );
-        }
-
-        // Create record instructions
-        if (lower.contains("crear") || lower.contains("nuevo") || lower.contains("agregar") || lower.contains("registrar")) {
-            StringBuilder sb = new StringBuilder("Para crear un registro, usa el endpoint POST correspondiente:\n\n");
-            for (String entity : ENTITIES) {
-                String plural = entity.toLowerCase() + "s";
-                sb.append("  POST /api/").append(plural).append("\n");
-                sb.append("  Body: { \"campo\": \"valor\", ... }\n\n");
-            }
-            sb.append("Ejemplo con curl:\n");
-            sb.append("  curl -X POST http://localhost:8080/api/").append(ENTITIES.get(0).toLowerCase()).append("s \\\n");
-            sb.append("    -H \"Authorization: Bearer <token>\" \\\n");
-            sb.append("    -H \"Content-Type: application/json\" \\\n");
-            sb.append("    -d '{ \"nombre\": \"ejemplo\" }'");
-            return new AiQueryResponse(sb.toString());
-        }
-
-        // Generic response
-        return new AiQueryResponse(
-            "No estoy seguro de entender tu consulta. Prueba con:\n" +
-            "  - 'hola' para un saludo\n" +
-            "  - 'entidades' para ver las entidades disponibles\n" +
-            "  - 'ayuda' para ver los comandos soportados\n" +
-            "  - 'crear registro' para instrucciones de creacion"
-        );
     }
 }

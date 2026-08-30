@@ -134,22 +134,32 @@ curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entitie
 
 ## IA Local (Motor de Reglas)
 
-El backend incluye un endpoint de IA local que no requiere internet. Usa un motor de reglas simple en Java puro.
+El backend incluye un endpoint de IA local basado en un motor de reglas simple, sin dependencias externas. Funciona 100% offline.
 
-### Endpoint
+### Como funciona
+
+1. **AiQueryService** analiza la consulta del usuario con coincidencia de keywords.
+2. Detecta la intencion (saludo, listar entidades, ayuda, etc.) y genera una respuesta contextual.
+3. Usa los nombres de entidades del diagrama para personalizar las respuestas.
+
+### Endpoints
 
 | Metodo | URL | Descripcion |
 |--------|-----|-------------|
 | POST | `/api/ai/query` | Enviar consulta en lenguaje natural |
 
-### Comandos Soportados
+### Intenciones Soportadas
 
-| Comando | Ejemplo | Respuesta |
-|---------|---------|-----------|
-| Saludo | "hola", "buenos dias" | Saludo amigable |
-| Entidades | "entidades", "listar entidades" | Lista las entidades del sistema |
+| Intencion | Ejemplo | Respuesta |
+|-----------|---------|-----------|
+| Saludo | "hola", "buenos dias" | Saludo amigable y presentacion |
+| Listar entidades | "entidades", "que hay" | Lista las entidades del sistema |
 | Ayuda | "ayuda", "help" | Muestra comandos disponibles |
-| Crear | "crear registro", "nuevo" | Instrucciones para crear registros |
+| Crear registro | "crear", "nuevo" | Instrucciones POST con ejemplos |
+| Consultar registro | "buscar", "ver detalle" | Instrucciones GET por ID |
+| Eliminar registro | "eliminar", "borrar" | Instrucciones DELETE |
+| Estadisticas | "cuantos", "metricas" | Metricas del sistema |
+| Desconocido | (cualquier otra cosa) | Mensaje de ayuda con sugerencias |
 
 ### Ejemplo de Uso (Bash)
 
@@ -159,17 +169,29 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['token'])")
 
-# Consulta: hola
+# Saludo
 curl -X POST http://localhost:8080/api/ai/query \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query": "hola"}'
 
-# Consulta: entidades
+# Listar entidades
 curl -X POST http://localhost:8080/api/ai/query \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query": "listar entidades"}'
+
+# Ayuda
+curl -X POST http://localhost:8080/api/ai/query \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "ayuda"}'
+
+# Crear registro
+curl -X POST http://localhost:8080/api/ai/query \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "crear registro"}'
 ```
 
 ### Ejemplo de Uso (PowerShell)
@@ -177,6 +199,15 @@ curl -X POST http://localhost:8080/api/ai/query \
 ```powershell
 $body = @{ query = "hola" } | ConvertTo-Json
 Invoke-RestMethod -Uri "http://localhost:8080/api/ai/query" -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $token" }
+```
+
+### Arquitectura IA
+
+```
+ai/
+├── AiQueryService.java      # Motor de reglas + logica de negocio
+├── AiController.java        # Endpoint REST
+└── AiQueryRequest.java      # DTO de entrada
 ```
 
 ---
