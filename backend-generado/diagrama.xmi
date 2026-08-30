@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.5.1" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:uml="http://www.omg.org/spec/UML/20131001">
+  <uml:Model xmi:id="model_1" name="Model">
+    <packagedElement xmi:type="uml:Package" xmi:id="package_1" name="Root">
+      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="primtype_String" name="String"/>
+      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="primtype_Real" name="Real"/>
+      <packagedElement xmi:type="uml:Class" xmi:id="class_0" name="User">
+        <ownedAttribute xmi:id="attr_0_0" name="id" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_0_1" name="username" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_0_2" name="email" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_0_3" name="createdAt" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="class_1" name="Order">
+        <ownedAttribute xmi:id="attr_1_0" name="id" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_1_1" name="orderDate" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_1_2" name="totalAmount" visibility="public">
+          <type xmi:idref="primtype_Real"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="class_2" name="Product">
+        <ownedAttribute xmi:id="attr_2_0" name="id" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_2_1" name="name" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_2_2" name="price" visibility="public">
+          <type xmi:idref="primtype_Real"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="class_3" name="Category">
+        <ownedAttribute xmi:id="attr_3_0" name="id" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="attr_3_1" name="name" visibility="public">
+          <type xmi:idref="primtype_String"/>
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedAttribute>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Generalization" xmi:id="gen_0">
+        <general xmi:idref="class_2"/>
+        <specific xmi:idref="class_1"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Association" xmi:id="assoc_1" name="">
+        <ownedEnd xmi:id="assoc_1_end1" type="class_3" association="assoc_1" aggregation="shared">
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+        </ownedEnd>
+        <ownedEnd xmi:id="assoc_1_end2" type="class_0" association="assoc_1">
+          <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="*"/>
+        </ownedEnd>
+      </packagedElement>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
