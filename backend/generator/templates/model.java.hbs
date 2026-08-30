@@ -1,0 +1,75 @@
+package com.example.demo.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "{{entityNameCamel}}")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+{{#if inheritance}}
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn(name = "dtype")
+{{/if}}
+public class {{entityNamePascal}} {{#if inheritance}}extends {{inheritance.parentEntityPascal}}{{/if}} {
+
+    {{#if primaryKey.isUuid}}
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "{{primaryKey.name}}", updatable = false, nullable = false)
+    private UUID {{primaryKey.nameCamel}};
+    {{else}}
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "{{primaryKey.name}}", updatable = false, nullable = false)
+    private {{primaryKey.javaType}} {{primaryKey.nameCamel}};
+    {{/if}}
+
+    {{#each attributes}}
+    {{#unless isPk}}
+    @Column(name = "{{nameSnake}}"{{#if unique}}, unique = true{{/if}}{{#unless nullable}}, nullable = false{{/unless}})
+    private {{javaType}} {{nameCamel}};
+    {{/unless}}
+    {{/each}}
+
+{{#each relations}}
+{{#if (eq jpaType "manyToOne")}}
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "{{fkColumn}}")
+    private {{otherEntityPascal}} {{fieldLabel}};
+
+{{/if}}
+{{#if (eq jpaType "oneToMany")}}
+    @OneToMany(mappedBy = "{{fieldLabel}}", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Set<{{otherEntityPascal}}> {{fieldLabelPlural}} = new HashSet<>();
+
+{{/if}}
+{{#if (eq jpaType "oneToOne")}}
+    {{#if isOwner}}
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "{{fkColumn}}", unique = true)
+    {{else}}
+    @OneToOne(mappedBy = "{{mappedBy}}", fetch = FetchType.LAZY)
+    {{/if}}
+    private {{otherEntityPascal}} {{fieldLabel}};
+
+{{/if}}
+{{#if (eq jpaType "manyToMany")}}
+    {{#if isOwner}}
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "{{mtmTableName}}",
+        joinColumns = @JoinColumn(name = "{{mtmJoinCol}}"),
+        inverseJoinColumns = @JoinColumn(name = "{{mtmInverseJoinCol}}")
+    )
+    {{else}}
+    @ManyToMany(mappedBy = "{{mappedBy}}", fetch = FetchType.LAZY)
+    {{/if}}
+    private Set<{{otherEntityPascal}}> {{fieldLabelPlural}} = new HashSet<>();
+
+{{/if}}
+{{/each}}
+}

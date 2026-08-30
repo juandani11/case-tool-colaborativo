@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.{{entityNamePascal}}DTO;
-import com.example.demo.service.{{entityNamePascal}}Service;
+import com.example.demo.dto.CategoryDTO;
+import com.example.demo.service.CategoryService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -14,25 +14,25 @@ import java.time.LocalDate;
 import java.math.BigDecimal;
 
 @RestController
-@RequestMapping("/api/{{pluralLowerCase entityName}}")
-public class {{entityNamePascal}}Controller {
+@RequestMapping("/api/categories")
+public class CategoryController {
 
     @Autowired
-    private {{entityNamePascal}}Service service;
+    private CategoryService service;
 
     @GetMapping
-    public ResponseEntity<Page<{{entityNamePascal}}DTO>> getAll(Pageable pageable) {
+    public ResponseEntity<Page<CategoryDTO>> getAll(Pageable pageable) {
         return ResponseEntity.ok(service.findAll(pageable));
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<{{entityNamePascal}}DTO>> getAllNoPage() {
+    public ResponseEntity<List<CategoryDTO>> getAllNoPage() {
         return ResponseEntity.ok(service.findAllNoPage());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<{{entityNamePascal}}DTO> getById(@PathVariable {{primaryKey.javaType}} id) {
-        {{entityNamePascal}}DTO dto = service.findById(id);
+    public ResponseEntity<CategoryDTO> getById(@PathVariable UUID id) {
+        CategoryDTO dto = service.findById(id);
         if (dto == null) {
             return ResponseEntity.notFound().build();
         }
@@ -40,20 +40,20 @@ public class {{entityNamePascal}}Controller {
     }
 
     @PostMapping
-    public ResponseEntity<{{entityNamePascal}}DTO> create(@Valid @RequestBody {{entityNamePascal}}DTO dto) {
+    public ResponseEntity<CategoryDTO> create(@Valid @RequestBody CategoryDTO dto) {
         return ResponseEntity.ok(service.save(dto));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<{{entityNamePascal}}DTO> update(
-            @PathVariable {{primaryKey.javaType}} id,
-            @Valid @RequestBody {{entityNamePascal}}DTO dto) {
-        dto.set{{primaryKey.namePascal}}(id);
+    public ResponseEntity<CategoryDTO> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody CategoryDTO dto) {
+        dto.setId(id);
         return ResponseEntity.ok(service.save(dto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable {{primaryKey.javaType}} id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

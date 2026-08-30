@@ -1,6 +1,6 @@
 # {{projectName}}
 
-Backend generado automáticamente a partir de un diagrama de entidades (AST). Basado en **Spring Boot 4.0.0**, **Java 21**, **PostgreSQL 18**, **Spring Security 7**, **JPA/Hibernate** y **JWT**.
+Backend generado automaticamente a partir de un diagrama de entidades. Basado en **Spring Boot 4.0.0**, **Java 21**, **PostgreSQL 18**, **Spring Security 7**, **JPA/Hibernate** y **JWT**.
 
 ---
 
@@ -13,9 +13,9 @@ Backend generado automáticamente a partir de un diagrama de entidades (AST). Ba
 
 ---
 
-## Configuración de Base de Datos
+## Configuracion de Base de Datos
 
-Por defecto, la aplicación espera una base de datos PostgreSQL con:
+Por defecto, la aplicacion espera una base de datos PostgreSQL con:
 
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/diagramdb
@@ -23,7 +23,7 @@ spring.datasource.username=postgres
 spring.datasource.password=postgres
 ```
 
-Si necesitas cambiar la configuración, edita `src/main/resources/application.properties` o define variables de entorno:
+Si necesitas cambiar la configuracion, edita `src/main/resources/application.properties` o define variables de entorno:
 
 ```bash
 export DB_URL=jdbc:postgresql://localhost:5432/tu_bd
@@ -33,37 +33,36 @@ export DB_PASS=tu_password
 
 ---
 
-## Ejecución
+## Ejecucion
 
 ```bash
-# Compilar y ejecutar
 mvn spring-boot:run
 ```
 
-La aplicación se inicia en `http://localhost:8080`.
+La aplicacion se inicia en `http://localhost:8080`.
 
 ---
 
 ## Esquema de Base de Datos
 
-El esquema se crea y actualiza automáticamente con Hibernate (`spring.jpa.hibernate.ddl-auto=update`). No se utilizan migraciones Flyway en esta versión.
+El esquema se crea y actualiza automaticamente con Hibernate (`spring.jpa.hibernate.ddl-auto=update`).
 
 ---
 
-## Autenticación (JWT)
+## Autenticacion (JWT)
 
-El backend usa **autenticación stateless con JWT**. El usuario por defecto es:
+El backend usa **autenticacion stateless con JWT**. El usuario por defecto es:
 
-| Usuario | Contraseña | Rol |
+| Usuario | Contrasena | Rol |
 |---------|------------|-----|
 | `admin` | `admin` | `ROLE_USER` |
 
-### Login (Bash con Python)
+### Login (Bash)
 
 ```bash
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}' | python -c "import sys, json; print(json.load(sys.stdin)['token'])"
+  -d '{"username":"admin","password":"admin"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['token'])"
 ```
 
 ### Login (PowerShell)
@@ -84,7 +83,7 @@ Respuesta:
 
 ### Uso del token
 
-Incluye el token en el header `Authorization` de cada petición protegida:
+Incluye el token en el header `Authorization` de cada peticion protegida:
 
 ```bash
 curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entities)}} \
@@ -93,14 +92,23 @@ curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entitie
 
 ---
 
+## Autenticacion (Publica)
+
+| Metodo | URL | Descripcion |
+|--------|-----|-------------|
+| POST | `/api/auth/login` | Autenticar usuario y obtener JWT |
+
+---
+
 ## Endpoints Disponibles
 
 {{#each entities}}
 ### {{entityNamePascal}}
 
-| Método | URL | Descripción |
+| Metodo | URL | Descripcion |
 |--------|-----|-------------|
-| GET    | `/api/{{pluralLowerCase entityName}}` | Listar todos los registros |
+| GET    | `/api/{{pluralLowerCase entityName}}` | Listar todos (paginado) |
+| GET    | `/api/{{pluralLowerCase entityName}}/all` | Listar todos (sin paginacion) |
 | GET    | `/api/{{pluralLowerCase entityName}}/{id}` | Obtener por ID |
 | POST   | `/api/{{pluralLowerCase entityName}}` | Crear nuevo registro |
 | PUT    | `/api/{{pluralLowerCase entityName}}/{id}` | Actualizar registro |
@@ -108,18 +116,10 @@ curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entitie
 
 **Campos del DTO:**
 {{#each attributes}}
-- `{{name}}` ({{javaType}}){{#if isPk}} — Clave primaria (autogenerada){{/if}}
+- `{{nameCamel}}` ({{javaType}}){{#if isPk}} — Clave primaria (autogenerada){{/if}}{{#unless isPk}}{{#unless nullable}} — Obligatorio{{/unless}}{{/unless}}
 {{/each}}
 
 {{/each}}
-
----
-
-## Autenticación (Pública)
-
-| Método | URL | Descripción |
-|--------|-----|-------------|
-| POST   | `/api/auth/login` | Autenticar usuario y obtener JWT |
 
 ---
 
@@ -138,13 +138,13 @@ curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entitie
 src/
 ├── main/
 │   ├── java/com/example/demo/
-│   │   ├── config/          # Configuración global (excepciones, CORS)
+│   │   ├── config/          # Configuracion global (excepciones, CORS)
 │   │   ├── controller/      # Controladores REST
 │   │   ├── dto/             # Data Transfer Objects
-│   │   ├── entity/          # Entidades JPA
+│   │   ├── model/           # Entidades JPA
 │   │   ├── repository/      # Repositorios Spring Data JPA
-│   │   ├── security/        # JWT, filtros, configuración de seguridad
-│   │   ├── service/         # Lógica de negocio
+│   │   ├── security/        # JWT, filtros, configuracion de seguridad
+│   │   ├── service/         # Logica de negocio
 │   │   └── DemoApplication.java
 │   └── resources/
 │       └── application.properties
@@ -153,20 +153,20 @@ src/
 
 ---
 
-## Pruebas Rápidas
+## Pruebas Rapidas
 
-### Opción A: Bash (Linux/macOS/Git Bash/WSL)
+### Opcion A: Bash (Linux/macOS/Git Bash/WSL)
 
 ```bash
 # 1. Login y guardar token
 TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}' | python -c "import sys, json; print(json.load(sys.stdin)['token'])")
+  -d '{"username":"admin","password":"admin"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['token'])")
 
 echo "Token: $TOKEN"
 ```
 
-### Opción B: PowerShell (Windows)
+### Opcion B: PowerShell (Windows)
 
 ```powershell
 # 1. Login y guardar token
@@ -176,12 +176,17 @@ $token = $response.token
 Write-Output "Token: $token"
 ```
 
+> **Nota:** Los IDs en los ejemplos usan `<uuid>` como placeholder. Reemplazalo con el UUID real al probar.
+
 {{#each entities}}
 ### {{entityNamePascal}} (`/api/{{pluralLowerCase entityName}}`)
 
 ```bash
-# Listar
+# Listar (paginado)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}
+
+# Listar todos
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/all
 
 # Crear
 curl -X POST http://localhost:8080/api/{{pluralLowerCase entityName}} \
@@ -190,20 +195,20 @@ curl -X POST http://localhost:8080/api/{{pluralLowerCase entityName}} \
   -d '{{{jsonExample this}}}'
 
 # Obtener por ID
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<id>
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<uuid>
 
 # Actualizar
-curl -X PUT http://localhost:8080/api/{{pluralLowerCase entityName}}/<id> \
+curl -X PUT http://localhost:8080/api/{{pluralLowerCase entityName}}/<uuid> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{{{jsonExample this}}}'
 
 # Eliminar
-curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<id>
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<uuid>
 ```
 
 {{/each}}
 
 ---
 
-*Generado automáticamente por **CASE Tool** — Generador de Backends Colaborativo*
+*Generado automaticamente por **CASE Tool** — Generador de Backends Colaborativo*

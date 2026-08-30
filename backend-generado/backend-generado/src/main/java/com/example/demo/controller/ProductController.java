@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.{{entityNamePascal}}DTO;
-import com.example.demo.service.{{entityNamePascal}}Service;
+import com.example.demo.dto.ProductDTO;
+import com.example.demo.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -14,25 +14,25 @@ import java.time.LocalDate;
 import java.math.BigDecimal;
 
 @RestController
-@RequestMapping("/api/{{pluralLowerCase entityName}}")
-public class {{entityNamePascal}}Controller {
+@RequestMapping("/api/products")
+public class ProductController {
 
     @Autowired
-    private {{entityNamePascal}}Service service;
+    private ProductService service;
 
     @GetMapping
-    public ResponseEntity<Page<{{entityNamePascal}}DTO>> getAll(Pageable pageable) {
+    public ResponseEntity<Page<ProductDTO>> getAll(Pageable pageable) {
         return ResponseEntity.ok(service.findAll(pageable));
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<{{entityNamePascal}}DTO>> getAllNoPage() {
+    public ResponseEntity<List<ProductDTO>> getAllNoPage() {
         return ResponseEntity.ok(service.findAllNoPage());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<{{entityNamePascal}}DTO> getById(@PathVariable {{primaryKey.javaType}} id) {
-        {{entityNamePascal}}DTO dto = service.findById(id);
+    public ResponseEntity<ProductDTO> getById(@PathVariable UUID id) {
+        ProductDTO dto = service.findById(id);
         if (dto == null) {
             return ResponseEntity.notFound().build();
         }
@@ -40,20 +40,20 @@ public class {{entityNamePascal}}Controller {
     }
 
     @PostMapping
-    public ResponseEntity<{{entityNamePascal}}DTO> create(@Valid @RequestBody {{entityNamePascal}}DTO dto) {
+    public ResponseEntity<ProductDTO> create(@Valid @RequestBody ProductDTO dto) {
         return ResponseEntity.ok(service.save(dto));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<{{entityNamePascal}}DTO> update(
-            @PathVariable {{primaryKey.javaType}} id,
-            @Valid @RequestBody {{entityNamePascal}}DTO dto) {
-        dto.set{{primaryKey.namePascal}}(id);
+    public ResponseEntity<ProductDTO> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody ProductDTO dto) {
+        dto.setId(id);
         return ResponseEntity.ok(service.save(dto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable {{primaryKey.javaType}} id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

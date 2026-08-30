@@ -2,11 +2,11 @@
 const typeMapper = {
   String: { sql: 'VARCHAR(255)', java: 'String' },
   Integer: { sql: 'INTEGER', java: 'Integer' },
+  Long: { sql: 'BIGINT', java: 'Long' },
   UUID: { sql: 'UUID', java: 'UUID' },
   BigDecimal: { sql: 'NUMERIC(19,2)', java: 'BigDecimal' },
   Date: { sql: 'DATE', java: 'LocalDate' },
   Boolean: { sql: 'BOOLEAN', java: 'Boolean' },
-  etc: { sql: 'VARCHAR(255)', java: 'String' },
 };
 
 function getSqlType(diagramType) {

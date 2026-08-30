@@ -1,8 +1,6 @@
 package com.example.demo.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import java.util.UUID;
@@ -23,34 +21,36 @@ public class {{entityNamePascal}}DTO {
     {{/unless}}
     {{#if isString}}
     {{#unless nullable}}
-    @NotBlank(message = "{{name}} no puede estar vacío")
+    @NotBlank(message = "{{name}} no puede estar vacio")
     {{/unless}}
     @Size(max = 255, message = "{{name}} no puede exceder 255 caracteres")
     {{/if}}
-    {{/unless}}
     private {{javaType}} {{nameCamel}};
     {{/unless}}
     {{/each}}
 
     {{#each relations}}
-    {{#if eq jpaType "manyToOne"}}
-    @JsonIgnore
-    private {{otherEntityPascal}} {{nameCamel}};
-    {{/if}}
+    {{#if (eq jpaType "manyToOne")}}
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private {{otherEntityPascal}}DTO {{fieldLabel}};
 
-    {{#if eq jpaType "oneToMany"}}
-    @JsonIgnore
-    private List<{{otherEntityPascal}}DTO> {{nameCamel}}List = new ArrayList<>();
+    private {{otherEntityPkType}} {{fieldLabel}}Id;
     {{/if}}
+    {{#if (eq jpaType "oneToOne")}}
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private {{otherEntityPascal}}DTO {{fieldLabel}};
 
-    {{#if eq jpaType "manyToMany"}}
-    @JsonIgnore
-    private List<{{otherEntityPascal}}DTO> {{nameCamel}}List = new ArrayList<>();
+    private {{otherEntityPkType}} {{fieldLabel}}Id;
     {{/if}}
+    {{#if (eq jpaType "oneToMany")}}
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private List<{{otherEntityPascal}}DTO> {{fieldLabelPlural}} = new java.util.ArrayList<>();
+    {{/if}}
+    {{#if (eq jpaType "manyToMany")}}
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private List<{{otherEntityPascal}}DTO> {{fieldLabelPlural}} = new java.util.ArrayList<>();
 
-    {{#if eq jpaType "oneToOne"}}
-    @JsonIgnore
-    private {{otherEntityPascal}} {{nameCamel}};
+    private List<{{otherEntityPkType}}> {{fieldLabelPlural}}Ids = new java.util.ArrayList<>();
     {{/if}}
     {{/each}}
 }

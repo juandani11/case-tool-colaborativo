@@ -4,7 +4,8 @@ const Handlebars = require('handlebars');
 const archiver = require('archiver');
 const { getSqlType, getJavaType } = require('./typeMapper');
 
-// Registrar helpers de Handlebars
+// ── Handlebars helpers ──────────────────────────────────────────────
+
 Handlebars.registerHelper('pascalCase', (str) => {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -15,6 +16,14 @@ Handlebars.registerHelper('camelCase', (str) => {
   return str.charAt(0).toLowerCase() + str.slice(1);
 });
 
+Handlebars.registerHelper('snakeCase', (str) => {
+  if (!str) return '';
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase();
+});
+
 Handlebars.registerHelper('plural', (str) => {
   if (!str) return '';
   return str.endsWith('s') ? str + 'es' : str + 's';
@@ -22,11 +31,47 @@ Handlebars.registerHelper('plural', (str) => {
 
 Handlebars.registerHelper('pluralLowerCase', (str) => {
   if (!str) return '';
-  let plural;
-  if (str.endsWith('s')) plural = str + 'es';
-  else if (str.endsWith('y')) plural = str.slice(0, -1) + 'ies';
-  else plural = str + 's';
-  return plural.toLowerCase();
+  const lower = str.toLowerCase();
+  if (lower.endsWith('s') || lower.endsWith('x') || lower.endsWith('z')) return lower + 'es';
+  if (lower.endsWith('ch') || lower.endsWith('sh')) return lower + 'es';
+  if (lower.endsWith('y') && !/[aeiou]$/.test(lower.slice(0, -1))) return lower.slice(0, -1) + 'ies';
+  return lower + 's';
+});
+
+Handlebars.registerHelper('eq', (a, b) => a === b);
+
+Handlebars.registerHelper('ne', (a, b) => a !== b);
+
+Handlebars.registerHelper('or', (...args) => {
+  const opts = args.pop();
+  return args.some(Boolean);
+});
+
+Handlebars.registerHelper('and', (...args) => {
+  const opts = args.pop();
+  return args.every(Boolean);
+});
+
+Handlebars.registerHelper('firstEntityName', (entities) => {
+  if (!entities || entities.length === 0) return '';
+  return entities[0].entityName;
+});
+
+Handlebars.registerHelper('sqlPkType', (sqlType, isUuid) => {
+  if (isUuid) return 'UUID';
+  if (sqlType === 'INTEGER') return 'SERIAL';
+  if (sqlType === 'BIGINT') return 'BIGSERIAL';
+  return sqlType;
+});
+
+Handlebars.registerHelper('safeTableName', (name) => {
+  const reservedWords = [
+    'user', 'group', 'order', 'table', 'column', 'index',
+    'select', 'insert', 'update', 'delete', 'from', 'where', 'join',
+    'create', 'drop', 'alter', 'primary', 'key', 'foreign', 'references',
+    'constraint', 'default', 'values', 'and', 'or', 'not', 'null',
+  ];
+  return reservedWords.includes(name.toLowerCase()) ? `"${name}"` : name;
 });
 
 Handlebars.registerHelper('jsonExample', (entityContext) => {
@@ -35,88 +80,25 @@ Handlebars.registerHelper('jsonExample', (entityContext) => {
     .filter(a => !a.isPk)
     .map(a => {
       let value;
-      if (a.javaType === 'String') value = `\"valor_${a.name}\"`;
+      if (a.javaType === 'String') value = `"valor_${a.name}"`;
       else if (a.javaType === 'Integer' || a.javaType === 'Long') value = '1';
       else if (a.javaType === 'BigDecimal') value = '9.99';
       else if (a.javaType === 'Boolean') value = 'true';
-      else if (a.javaType === 'LocalDate') value = '\"2024-01-01\"';
-      else if (a.javaType === 'UUID') value = '\"00000000-0000-0000-0000-000000000000\"';
-      else value = '\"valor\"';
-      return `\"${a.name}\": ${value}`;
+      else if (a.javaType === 'LocalDate') value = '"2024-01-01"';
+      else value = '"valor"';
+      return `"${a.name}": ${value}`;
     })
     .join(', ');
   return `{${fields}}`;
 });
 
-Handlebars.registerHelper('firstEntityName', (entities) => {
-  if (!entities || entities.length === 0) return '';
-  return entities[0].entityName;
-});
+// ── Template loading ────────────────────────────────────────────────
 
-Handlebars.registerHelper('eq', (a, b) => a === b);
-
-// Helper para tipos SQL de clave primaria
-Handlebars.registerHelper('sqlPkType', (sqlType, isUuid) => {
-  if (isUuid) return 'UUID';
-  if (sqlType === 'INTEGER') return 'SERIAL';
-  if (sqlType === 'BIGINT') return 'BIGSERIAL';
-  return sqlType;
-});
-
-// Helper para nombres de tabla seguros (comillas dobles para PostgreSQL)
-Handlebars.registerHelper('safeTableName', (name) => {
-  const reservedWords = [
-    'user', 'group', 'order', 'table', 'column', 'index',
-    'select', 'insert', 'update', 'delete', 'from', 'where', 'join',
-    'create', 'drop', 'alter', 'primary', 'key', 'foreign', 'references',
-    'constraint', 'default', 'values', 'and', 'or', 'not', 'null',
-    'true', 'false', 'like', 'between', 'case', 'when', 'then', 'else',
-    'end', 'as', 'into', 'on', 'off', 'with', 'without'
-  ];
-
-  const lowerName = name.toLowerCase();
-  if (reservedWords.includes(lowerName)) {
-    return `"${name}"`;
-  }
-  return name;
-});
-
-// Helper para determinar si una relación es ManyToMany
-Handlebars.registerHelper('isManyToMany', (cardFrom, cardTo) => {
-  return (cardFrom === 'N' || cardFrom === '*') && (cardTo === 'N' || cardTo === '*');
-});
-
-// Helper para determinar si es OneToMany
-Handlebars.registerHelper('isOneToMany', (cardFrom, cardTo) => {
-  return cardFrom === '1' && (cardTo === 'N' || cardTo === '*');
-});
-
-// Helper para determinar si es ManyToOne
-Handlebars.registerHelper('isManyToOne', (cardFrom, cardTo) => {
-  return (cardFrom === 'N' || cardFrom === '*') && cardTo === '1';
-});
-
-// Helper para determinar si es OneToOne
-Handlebars.registerHelper('isOneToOne', (cardFrom, cardTo) => {
-  return cardFrom === '1' && cardTo === '1';
-});
-
-// Helper para obtener el lado propietario
-Handlebars.registerHelper('isOwnerSide', (cardFrom) => {
-  return cardFrom === '1';
-});
-
-// Helper para el nombre del mappedBy (lado inverso)
-Handlebars.registerHelper('mappedByName', (entityName) => {
-  return entityName + 'Entities';
-});
-
-// Cargar plantillas (puede ser dinámico, como ya tenías)
 const templateDir = path.join(__dirname, 'templates');
 const templates = {
   'pom.xml': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'pom.xml.hbs'), 'utf8')),
   'application.properties': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'application.properties.hbs'), 'utf8')),
-  'entity': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'entity.java.hbs'), 'utf8')),
+  'model': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'model.java.hbs'), 'utf8')),
   'repository': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'repository.java.hbs'), 'utf8')),
   'service': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'service.java.hbs'), 'utf8')),
   'controller': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'controller.java.hbs'), 'utf8')),
@@ -132,6 +114,145 @@ const templates = {
   'userService': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'security', 'UserService.java.hbs'), 'utf8')),
 };
 
+// ── Core generation ─────────────────────────────────────────────────
+
+const BASE_PACKAGE = 'com.example.demo';
+const BASE_PATH = `src/main/java/${BASE_PACKAGE.replace(/\./g, '/')}`;
+
+function resolveCardinality(cardFrom, cardTo) {
+  const isFromMany = cardFrom === 'N' || cardFrom === '*' || cardFrom === 'M';
+  const isToMany = cardTo === 'N' || cardTo === '*' || cardTo === 'M';
+  const isFromOne = cardFrom === '1' || cardFrom === '0..1';
+  const isToOne = cardTo === '1' || cardTo === '0..1';
+
+  if (isFromMany && isToMany) return 'manyToMany';
+  if (isFromOne && isToOne) return 'oneToOne';
+  if (isFromOne && isFromMany) return 'oneToMany';
+  if (isFromMany && isToOne) return 'manyToOne';
+  // fallback: treat ?..N as many
+  if (isFromMany) return 'manyToOne';
+  return 'oneToMany';
+}
+
+function snakeCase(str) {
+  if (!str) return '';
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase();
+}
+
+function pascalCase(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function camelCase(str) {
+  if (!str) return '';
+  return str.charAt(0).toLowerCase() + str.slice(1);
+}
+
+function buildEntityRelations(entity, allEntities, allRelationships) {
+  const entityName = entity.name;
+  const results = [];
+
+  for (const rel of allRelationships) {
+    const isSource = rel.source.entityName === entityName;
+    const isTarget = rel.target.entityName === entityName;
+    if (!isSource && !isTarget) continue;
+
+    const otherName = isSource ? rel.target.entityName : rel.source.entityName;
+    const otherEntity = allEntities.find(e => e.name === otherName);
+
+    const cardFrom = rel.cardinalityFrom || '1';
+    const cardTo = rel.cardinalityTo || '1';
+
+    // Determine JPA type from THIS entity's perspective
+    let jpaType;
+    if (isSource) {
+      jpaType = resolveCardinality(cardFrom, cardTo);
+    } else {
+      jpaType = resolveCardinality(cardTo, cardFrom);
+    }
+
+    const otherNamePascal = pascalCase(otherName);
+    const otherNameCamel = camelCase(otherName);
+    const thisNameCamel = camelCase(entityName);
+
+    // FK column name (snake_case for SQL)
+    const fkColumn = snakeCase(otherName) + '_id';
+
+    // ManyToMany metadata
+    const mtmTableName = snakeCase(thisNameCamel) + '_' + snakeCase(otherNameCamel);
+    const mtmJoinCol = snakeCase(otherNameCamel) + '_id';
+    const mtmInverseJoinCol = snakeCase(thisNameCamel) + '_id';
+
+    // Determine if this side is the OWNING side
+    // JPA rule: the side with the @JoinColumn is the owner
+    // For OneToOne: the side with FK is owner
+    // For OneToMany/ManyToOne: the Many side is owner
+    // For ManyToMany: the source side is owner (by convention)
+    let isOwner = false;
+    let mappedBy = null;
+
+    switch (jpaType) {
+      case 'oneToOne':
+        // If the other side also has a OneToOne, the one with FK is owner
+        // Since we're generating from AST, we make the source the owner
+        isOwner = isSource;
+        mappedBy = isOwner ? null : otherNameCamel;
+        break;
+      case 'manyToOne':
+        isOwner = true;
+        break;
+      case 'oneToMany':
+        isOwner = false;
+        mappedBy = otherNameCamel;
+        break;
+      case 'manyToMany':
+        isOwner = isSource;
+        mappedBy = isOwner ? null : otherNameCamel + 'Set';
+        break;
+    }
+
+    results.push({
+      jpaType,
+      otherEntity: otherName,
+      otherEntityPascal: otherNamePascal,
+      otherEntityCamel: otherNameCamel,
+      otherEntityCamelPlural: otherNameCamel + 's',
+      otherEntityPkType: otherEntity ? (otherEntity.attributes.find(a => a.isPk) ? getJavaType(otherEntity.attributes.find(a => a.isPk).type) : 'Long') : 'Long',
+      fkColumn,
+      isOwner,
+      mappedBy,
+      relationshipType: rel.type,
+      cardinalityFrom: cardFrom,
+      cardinalityTo: cardTo,
+      isSource,
+      // ManyToMany metadata
+      mtmTableName,
+      mtmJoinCol,
+      mtmInverseJoinCol,
+      // Labels for display
+      fieldLabel: otherNameCamel,
+      fieldLabelPlural: otherNameCamel + 's',
+    });
+  }
+
+  return results;
+}
+
+function buildInheritanceInfo(entity, allEntities, allRelationships) {
+  const rel = allRelationships.find(
+    r => r.type === 'INHERITANCE' && r.target.entityName === entity.name
+  );
+  if (!rel) return null;
+  return {
+    parentEntity: rel.source.entityName,
+    parentEntityPascal: pascalCase(rel.source.entityName),
+  };
+}
+
 function generateProject(ast) {
   return new Promise((resolve, reject) => {
     try {
@@ -140,38 +261,36 @@ function generateProject(ast) {
       const outputDir = path.join(outputRoot, projectName + '-' + Date.now());
       fs.mkdirSync(outputDir, { recursive: true });
 
-      // 1. pom.xml
+      const entities = ast.entities || [];
+      const relationships = ast.relationships || [];
+
+      function writeFile(relativePath, content) {
+        const fullPath = path.join(outputDir, relativePath);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, content);
+      }
+
+      // ── 1. pom.xml ──
       writeFile('pom.xml', templates['pom.xml']({ projectName }));
 
-      // 2. application.properties
+      // ── 2. application.properties ──
       writeFile('src/main/resources/application.properties', templates['application.properties']({}));
 
-      // 3. Clase principal
-      writeFile('src/main/java/com/example/demo/DemoApplication.java', templates['mainApp']({}));
+      // ── 3. Main app ──
+      writeFile(`${BASE_PATH}/DemoApplication.java`, templates['mainApp']({}));
 
-      // 4. Entidades, repositorios, servicios, controladores, DTOs
-      const entities = ast.entities || [];
+      // ── 4. Entity contexts ──
       const entityContexts = [];
 
-      // Construir un mapa de relaciones por entidad
-      const relationshipsMap = {};
-      const relationships = ast.relationships || [];
-      relationships.forEach(rel => {
-        const key = rel.source.entityName + '-' + rel.target.entityName;
-        if (!relationshipsMap[key]) {
-          relationshipsMap[key] = [];
-        }
-        relationshipsMap[key].push(rel);
-      });
-
       for (const entity of entities) {
+        // Primary key
         let primaryKeyAttr = entity.attributes.find(a => a.isPk);
         let primaryKey;
         if (primaryKeyAttr) {
           primaryKey = {
             name: primaryKeyAttr.name,
-            namePascal: Handlebars.helpers.pascalCase(primaryKeyAttr.name),
-            nameCamel: Handlebars.helpers.camelCase(primaryKeyAttr.name),
+            namePascal: pascalCase(primaryKeyAttr.name),
+            nameCamel: camelCase(primaryKeyAttr.name),
             javaType: getJavaType(primaryKeyAttr.type),
             sqlType: getSqlType(primaryKeyAttr.type),
             isUuid: primaryKeyAttr.type === 'UUID',
@@ -187,90 +306,35 @@ function generateProject(ast) {
           };
         }
 
-        // Obtener relaciones de esta entidad (como source y como target)
-        const relsAsSource = (relationshipsMap[entity.name] || []).filter(r => r.source.entityName === entity.name);
-        const relsAsTarget = (relationshipsMap[entity.name + '-'] || []).filter(r => r.target.entityName === entity.name);
-        // Note: the above assumes a specific format; let's adjust
+        // Relations for this entity
+        const relations = buildEntityRelations(entity, entities, relationships);
 
-        // Better: collect all relationships where entity is source or target
-        const allRels = relationships.filter(r => r.source.entityName === entity.name || r.target.entityName === entity.name);
+        // Inheritance info
+        const inheritance = buildInheritanceInfo(entity, entities, relationships);
 
-        const relations = allRels.map(rel => {
-          const isSource = rel.source.entityName === entity.name;
-          const otherEntity = isSource ? rel.target.entityName : rel.source.entityName;
-          const otherIsSource = rel.source.entityName === otherEntity;
-          const otherEntityIsOther = !otherIsSource;
-
-          let jpaType = 'none';
-          let mappedBy = null;
-
-          // Determinar tipo JPA basado en cardinalidades
-          const cardFrom = rel.cardinalityFrom;
-          const cardTo = rel.cardinalityTo;
-
-          if (cardFrom === '1' && cardTo === '1') {
-            jpaType = 'oneToOne';
-          } else if ((cardFrom === 'N' || cardFrom === '*') && (cardTo === 'N' || cardTo === '*')) {
-            jpaType = 'manyToMany';
-            // Para ManyToMany, fijar nombres estándar para la tabla unida y columnas
-            // La tabla será: entidadActual + entidadRelacionada
-            // Los joinColumns serán: entidadRelacionada_id en esta entidad
-            // Los inverseJoinColumns serán: entidadActual_id en la entidad relacionada
-            jpaType = 'manyToMany'; // Re-asignar para mantener la bandera
-            // Añadir metadatos para la plantilla ManyToMany
-            // Usaremos convenciones: tableName = entidadActualCamel + otrosEntityCamel
-            // joinColumnName = otrosEntityCamel + "_id"
-            // inverseJoinColumnName = entidadActualCamel + "_id"
-            // Pero handlards no puede pasar objetos complejos fácilmente, así que fijaremos valores en la plantilla
-          } else if (cardFrom === '1' && (cardTo === 'N' || cardTo === '*')) {
-            jpaType = 'oneToMany';
-          } else if ((cardFrom === 'N' || cardFrom === '*') && cardTo === '1') {
-            jpaType = 'manyToOne';
-          }
-
-          // Determinar mappedBy para el lado no propietario
-          // Regla JPA: 
-          // - Si oneToMany y la entidad actual es el lado "one" (source con cardFrom='1'), 
-            //   mappedBy apunta al campo ManyToOne en la entidad many (usamos otherEntityCamel como nombre convencional)
-            // - Si oneToMany y la entidad actual es el lado "many", mappedBy es null (no hay @OneToMany en este lado)
-            // - manyToOne siempre tiene el @ManyToOne en la entidad correspondiente
-          if (jpaType === 'oneToMany') {
-            // Si es el lado "one" (cardFrom='1'), setear mappedBy al nombre camelCase de la entidad many
-            // Si es el lado "many", mappedBy es null (no se añade @OneToMany aquí, solo @ManyToOne)
-            mappedBy = isSource ? otherEntityCamel : null;
-          } else if (jpaType === 'manyToOne') {
-            // Siempre hay @ManyToOne, mappedBy no aplica aquí (es el lado dueño)
-            mappedBy = null;
-          }
-
-          return {
-            jpaType,
-            mappedBy,
-            otherEntity,
-            otherEntityPascal: Handlebars.helpers.pascalCase(otherEntity),
-            otherEntityCamel: Handlebars.helpers.camelCase(otherEntity),
-            relationshipType: rel.type,
-            cardinalityFrom: rel.cardinalityFrom,
-            cardinalityTo: rel.cardinalityTo,
-            isSource: isSource,
-            relationshipLabel: rel.label,
-            // Metadatos para ManyToMany
-            manyToManyTableName: isSource ? `${entity.nameCamel}${otherEntity}` : `${otherEntity}${entity.nameCamel}`,
-            manyToManyJoinColumnName: isSource ? `${otherEntityCamel}_id` : `${entity.nameCamel}_id`,
-            manyToManyInverseJoinColumnName: isSource ? `${entity.nameCamel}_id` : `${otherEntityCamel}_id`,
-          };
-        });
+        // Check if this entity is a parent (has children)
+        const isParent = relationships.some(
+          r => r.type === 'INHERITANCE' && r.source.entityName === entity.name
+        );
+        const children = relationships
+          .filter(r => r.type === 'INHERITANCE' && r.source.entityName === entity.name)
+          .map(r => ({
+            childEntity: r.target.entityName,
+            childEntityPascal: pascalCase(r.target.entityName),
+          }));
 
         const context = {
           entityName: entity.name,
-          entityNamePascal: Handlebars.helpers.pascalCase(entity.name),
-          entityNameCamel: Handlebars.helpers.camelCase(entity.name),
-          entityNamePlural: Handlebars.helpers.plural(entity.name),
+          entityNamePascal: pascalCase(entity.name),
+          entityNameCamel: camelCase(entity.name),
+          entityNamePlural: entity.name + 's',
+          entityNamePluralCamel: camelCase(entity.name) + 's',
           primaryKey,
-          attributes: entity.attributes.map(attr => ({
+          attributes: (entity.attributes || []).map(attr => ({
             name: attr.name,
-            namePascal: Handlebars.helpers.pascalCase(attr.name),
-            nameCamel: Handlebars.helpers.camelCase(attr.name),
+            namePascal: pascalCase(attr.name),
+            nameCamel: camelCase(attr.name),
+            nameSnake: snakeCase(attr.name),
             javaType: getJavaType(attr.type),
             sqlType: getSqlType(attr.type),
             isPk: attr.isPk || false,
@@ -278,37 +342,67 @@ function generateProject(ast) {
             unique: attr.unique || false,
             isString: getJavaType(attr.type) === 'String',
           })),
-          relations: relations,  // NUEVO: información de relaciones para la plantilla
+          relations,
+          inheritance,
+          isParent,
+          children,
+          // Flags for template conditionals
+          hasOwnRelations: relations.length > 0,
+          hasManyToOne: relations.some(r => r.jpaType === 'manyToOne'),
+          hasOneToMany: relations.some(r => r.jpaType === 'oneToMany'),
+          hasManyToMany: relations.some(r => r.jpaType === 'manyToMany'),
+          hasOneToOne: relations.some(r => r.jpaType === 'oneToOne'),
+          hasInheritance: !!inheritance,
         };
+
         entityContexts.push(context);
 
-        writeFile(`src/main/java/com/example/demo/entity/${context.entityNamePascal}.java`, templates['entity'](context));
-        writeFile(`src/main/java/com/example/demo/repository/${context.entityNamePascal}Repository.java`, templates['repository'](context));
-        writeFile(`src/main/java/com/example/demo/service/${context.entityNamePascal}Service.java`, templates['service'](context));
-        writeFile(`src/main/java/com/example/demo/controller/${context.entityNamePascal}Controller.java`, templates['controller'](context));
-        writeFile(`src/main/java/com/example/demo/dto/${context.entityNamePascal}DTO.java`, templates['dto'](context));
+        // Generate model (entity), repository, service, controller, DTO
+        writeFile(
+          `${BASE_PATH}/model/${context.entityNamePascal}.java`,
+          templates['model'](context)
+        );
+        writeFile(
+          `${BASE_PATH}/repository/${context.entityNamePascal}Repository.java`,
+          templates['repository'](context)
+        );
+        writeFile(
+          `${BASE_PATH}/service/${context.entityNamePascal}Service.java`,
+          templates['service'](context)
+        );
+        writeFile(
+          `${BASE_PATH}/controller/${context.entityNamePascal}Controller.java`,
+          templates['controller'](context)
+        );
+        writeFile(
+          `${BASE_PATH}/dto/${context.entityNamePascal}DTO.java`,
+          templates['dto'](context)
+        );
       }
 
-      // 5. Seguridad
-      writeFile('src/main/java/com/example/demo/security/SecurityConfig.java', templates['securityConfig']({}));
-      writeFile('src/main/java/com/example/demo/security/JwtService.java', templates['jwtService']({}));
-      writeFile('src/main/java/com/example/demo/security/JwtAuthenticationFilter.java', templates['jwtFilter']({}));
-      writeFile('src/main/java/com/example/demo/security/AuthController.java', templates['authController']({}));
-      writeFile('src/main/java/com/example/demo/security/UserService.java', templates['userService']({}));
+      // ── 5. Security ──
+      writeFile(`${BASE_PATH}/security/SecurityConfig.java`, templates['securityConfig']({}));
+      writeFile(`${BASE_PATH}/security/JwtService.java`, templates['jwtService']({}));
+      writeFile(`${BASE_PATH}/security/JwtAuthenticationFilter.java`, templates['jwtFilter']({}));
+      writeFile(`${BASE_PATH}/security/AuthController.java`, templates['authController']({}));
+      writeFile(`${BASE_PATH}/security/AppUserDetailsService.java`, templates['userService']({}));
 
-      // 5b. Manejo global de excepciones
-      writeFile('src/main/java/com/example/demo/config/GlobalExceptionHandler.java', templates['globalExceptionHandler']({}));
+      // ── 6. Global exception handler ──
+      writeFile(`${BASE_PATH}/config/GlobalExceptionHandler.java`, templates['globalExceptionHandler']({}));
 
-      // 5c. README.md
+      // ── 7. README ──
       writeFile('README.md', templates['readme']({
         projectName,
-        entities: entityContexts
+        entities: entityContexts,
       }));
 
-      // 6. Migraciones Flyway
-      writeFile('src/main/resources/db/migration/V1__init.sql', templates['migration']({ entities: entityContexts }));
+      // ── 8. Flyway migration ──
+      writeFile(
+        'src/main/resources/db/migration/V1__init.sql',
+        templates['migration']({ entities: entityContexts })
+      );
 
-      // 7. Empaquetar ZIP
+      // ── 9. ZIP ──
       const zipPath = path.join(outputRoot, projectName + '.zip');
       const output = fs.createWriteStream(zipPath);
       const archive = archiver('zip', { zlib: { level: 9 } });
@@ -319,12 +413,6 @@ function generateProject(ast) {
       archive.pipe(output);
       archive.directory(outputDir, false);
       archive.finalize();
-
-      function writeFile(relativePath, content) {
-        const fullPath = path.join(outputDir, relativePath);
-        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-        fs.writeFileSync(fullPath, content);
-      }
     } catch (error) {
       reject(error);
     }
