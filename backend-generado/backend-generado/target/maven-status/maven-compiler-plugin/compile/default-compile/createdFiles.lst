@@ -1,4 +1,5 @@
 com\example\demo\DemoApplication.class
+com\example\demo\ai\AiQueryResponse.class
 com\example\demo\dto\ProductDTO.class
 com\example\demo\service\UserService.class
 com\example\demo\model\Category.class
@@ -13,14 +14,17 @@ com\example\demo\config\GlobalExceptionHandler.class
 com\example\demo\controller\UserController.class
 com\example\demo\repository\OrderRepository.class
 com\example\demo\service\ProductService.class
+com\example\demo\ai\AiQueryRequest.class
 com\example\demo\security\AuthController.class
 com\example\demo\model\User.class
 com\example\demo\controller\ProductController.class
+com\example\demo\ai\AiQueryService.class
 com\example\demo\service\OrderService.class
 com\example\demo\security\JwtAuthenticationFilter.class
 com\example\demo\security\JwtService.class
 com\example\demo\security\AuthController$LoginRequest.class
 com\example\demo\controller\CategoryController.class
+com\example\demo\ai\AiController.class
 com\example\demo\dto\OrderDTO.class
 com\example\demo\controller\OrderController.class
 com\example\demo\repository\ProductRepository.class

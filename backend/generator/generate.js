@@ -112,6 +112,10 @@ const templates = {
   'jwtFilter': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'security', 'JwtAuthenticationFilter.java.hbs'), 'utf8')),
   'authController': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'security', 'AuthController.java.hbs'), 'utf8')),
   'userService': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'security', 'UserService.java.hbs'), 'utf8')),
+  'aiQueryRequest': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'AiQueryRequest.java.hbs'), 'utf8')),
+  'aiQueryResponse': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'AiQueryResponse.java.hbs'), 'utf8')),
+  'aiQueryService': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'AiQueryService.java.hbs'), 'utf8')),
+  'aiController': Handlebars.compile(fs.readFileSync(path.join(templateDir, 'ai', 'AiController.java.hbs'), 'utf8')),
 };
 
 // ── Core generation ─────────────────────────────────────────────────
@@ -387,7 +391,14 @@ function generateProject(ast) {
       writeFile(`${BASE_PATH}/security/AuthController.java`, templates['authController']({}));
       writeFile(`${BASE_PATH}/security/AppUserDetailsService.java`, templates['userService']({}));
 
-      // ── 6. Global exception handler ──
+      // ── 6. AI Local Query ──
+      const entityNamesStr = entityContexts.map(e => `"${e.entityNamePascal}"`).join(', ');
+      writeFile(`${BASE_PATH}/ai/AiQueryRequest.java`, templates['aiQueryRequest']({}));
+      writeFile(`${BASE_PATH}/ai/AiQueryResponse.java`, templates['aiQueryResponse']({}));
+      writeFile(`${BASE_PATH}/ai/AiQueryService.java`, templates['aiQueryService']({ entityNames: entityNamesStr }));
+      writeFile(`${BASE_PATH}/ai/AiController.java`, templates['aiController']({}));
+
+      // ── 7. Global exception handler ──
       writeFile(`${BASE_PATH}/config/GlobalExceptionHandler.java`, templates['globalExceptionHandler']({}));
 
       // ── 7. README ──
