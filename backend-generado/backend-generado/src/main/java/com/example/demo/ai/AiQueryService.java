@@ -16,7 +16,7 @@ public class AiQueryService {
     @Autowired
     public AiQueryService(IntentClassifier intentClassifier) {
         this.intentClassifier = intentClassifier;
-        this.entityNames = Arrays.asList("Cliente", "Pedido", "Producto", "Factura");
+        this.entityNames = Arrays.asList("User", "Product", "Order", "OrderItem", "Category");
     }
 
     public AiQueryResponse process(String input) {
