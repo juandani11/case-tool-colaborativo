@@ -1,0 +1,60 @@
+{
+  "name": "Diagrama 1",
+  "nodes": [
+    {
+      "id": "entity_1788128456885_yuyzl1mf0",
+      "type": "entity",
+      "position": {
+        "x": 372.07777598154115,
+        "y": 79.14459400980942
+      },
+      "data": {
+        "label": "NuevaEntidad",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    },
+    {
+      "id": "entity_1788128457733_egjmffljb",
+      "type": "entity",
+      "position": {
+        "x": 622.0585073691633,
+        "y": 393.3514795211799
+      },
+      "data": {
+        "label": "NuevaEntidad2",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1788128629601_5uknm",
+            "name": "nuevoAtributo",
+            "type": "String",
+            "isPk": false,
+            "nullable": true,
+            "unique": true
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 90
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1788128461813_wsv8qffvf",
+      "source": "entity_1788128456885_yuyzl1mf0",
+      "target": "entity_1788128457733_egjmffljb",
+      "type": "inheritance",
+      "data": {
+        "type": "INHERITANCE",
+        "cardinalityFrom": "0..1",
+        "cardinalityTo": "*"
+      }
+    }
+  ],
+  "chat": []
+}

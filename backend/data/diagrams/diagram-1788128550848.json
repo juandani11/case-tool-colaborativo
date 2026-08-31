@@ -1,0 +1,23 @@
+{
+  "name": "Diagrama 1788128550848",
+  "nodes": [
+    {
+      "id": "entity_1788131754723_nifh6mxe4",
+      "type": "entity",
+      "position": {
+        "x": 449.26424006995893,
+        "y": 317.57810493142256
+      },
+      "data": {
+        "label": "NuevaEntidad",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    }
+  ],
+  "edges": [],
+  "chat": []
+}
