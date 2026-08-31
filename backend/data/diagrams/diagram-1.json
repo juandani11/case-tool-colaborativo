@@ -2,38 +2,112 @@
   "name": "Diagrama 1",
   "nodes": [
     {
-      "id": "entity_1788128456885_yuyzl1mf0",
+      "id": "entity_1788182784277_cq4qwfvel",
       "type": "entity",
       "position": {
-        "x": 372.07777598154115,
-        "y": 79.14459400980942
+        "x": -506.18286109860264,
+        "y": -24.798539704510688
       },
       "data": {
-        "label": "NuevaEntidad",
-        "stereotype": "class",
-        "attributes": [],
-        "methods": []
-      },
-      "width": 220,
-      "height": 72
-    },
-    {
-      "id": "entity_1788128457733_egjmffljb",
-      "type": "entity",
-      "position": {
-        "x": 622.0585073691633,
-        "y": 393.3514795211799
-      },
-      "data": {
-        "label": "NuevaEntidad2",
+        "label": "Customer",
         "stereotype": "class",
         "attributes": [
           {
-            "id": "attr_1788128629601_5uknm",
-            "name": "nuevoAtributo",
+            "id": "attr_1788182784277_0_fb50o",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1788182784277_1_qca52",
+            "name": "name",
             "type": "String",
             "isPk": false,
-            "nullable": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1788182784277_2_gxuau",
+            "name": "email",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": true
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 126
+    },
+    {
+      "id": "entity_1788182784278_gs8lihi9n",
+      "type": "entity",
+      "position": {
+        "x": -443.3080845184373,
+        "y": 392.74878930414945
+      },
+      "data": {
+        "label": "Order",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1788182784278_0_0ng1g",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1788182784278_1_5dqvd",
+            "name": "orderDate",
+            "type": "Date",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1788182784278_2_49oq0",
+            "name": "total",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1788182784278_3_ubpi1",
+            "name": "customerId",
+            "type": "UUID",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 144
+    },
+    {
+      "id": "entity_1788183418504_i9kzh8fh8",
+      "type": "entity",
+      "position": {
+        "x": 4.068587334298201,
+        "y": 173.97219485921983
+      },
+      "data": {
+        "label": "NewEntity",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1788183418504_0_t5667",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
             "unique": true
           }
         ],
@@ -45,14 +119,14 @@
   ],
   "edges": [
     {
-      "id": "edge_1788128461813_wsv8qffvf",
-      "source": "entity_1788128456885_yuyzl1mf0",
-      "target": "entity_1788128457733_egjmffljb",
+      "id": "edge_1788183322498_gsphrqct8",
+      "source": "entity_1788182784277_cq4qwfvel",
+      "target": "entity_1788182784278_gs8lihi9n",
       "type": "inheritance",
       "data": {
         "type": "INHERITANCE",
         "cardinalityFrom": "0..1",
-        "cardinalityTo": "*"
+        "cardinalityTo": "1..*"
       }
     }
   ],

@@ -5,8 +5,8 @@
       "id": "entity_1788128922120_2ute7fn0o",
       "type": "entity",
       "position": {
-        "x": -133.51659074225705,
-        "y": 2.7511727490881412
+        "x": -51.70710027433762,
+        "y": -31.556032931007095
       },
       "data": {
         "label": "User",
@@ -54,8 +54,8 @@
       "id": "entity_1788128922123_6g2wt8vq9",
       "type": "entity",
       "position": {
-        "x": 512.9147247805683,
-        "y": 38.3367868635562
+        "x": 323.1156424356557,
+        "y": 263.19467725943355
       },
       "data": {
         "label": "Product",
@@ -103,8 +103,8 @@
       "id": "entity_1788128922126_vajq5kdmo",
       "type": "entity",
       "position": {
-        "x": -18.0175250734805,
-        "y": 277.9299178937231
+        "x": -225.34345540516995,
+        "y": 312.3052016792882
       },
       "data": {
         "label": "Order",
@@ -152,8 +152,8 @@
       "id": "entity_1788128922128_ht4hcsrmf",
       "type": "entity",
       "position": {
-        "x": 264.0459858961545,
-        "y": 515.8756414118585
+        "x": -10.650874778085097,
+        "y": 667.6439963699041
       },
       "data": {
         "label": "OrderItem",
@@ -209,8 +209,8 @@
       "id": "entity_1788128922132_2ysms6ot0",
       "type": "entity",
       "position": {
-        "x": 925.9707777149711,
-        "y": 405.83894516977256
+        "x": 557.8280706093335,
+        "y": 655.6475335216687
       },
       "data": {
         "label": "Category",
@@ -241,42 +241,86 @@
   ],
   "edges": [
     {
-      "id": "edge_1788128922136_qlrg5wpl1",
+      "id": "edge_1788181874136_sl8ygiqmx",
+      "source": "entity_1788128922120_2ute7fn0o",
+      "target": "entity_1788128922126_vajq5kdmo",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1788181878384_msbxlwgwv",
+      "source": "entity_1788128922126_vajq5kdmo",
+      "target": "entity_1788128922128_ht4hcsrmf",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1788181886784_ovwql9auw",
+      "source": "entity_1788128922123_6g2wt8vq9",
+      "target": "entity_1788128922128_ht4hcsrmf",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1788181892736_ix2kh1008",
+      "source": "entity_1788128922123_6g2wt8vq9",
+      "target": "entity_1788128922132_2ysms6ot0",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1788181933103_j13t54a7g",
       "source": "entity_1788128922120_2ute7fn0o",
       "target": "entity_1788128922126_vajq5kdmo",
       "data": {
         "type": "ONE_TO_MANY",
         "cardinalityFrom": "1",
-        "cardinalityTo": "0..*"
+        "cardinalityTo": "N"
       }
     },
     {
-      "id": "edge_1788128922137_yw43htq0t",
+      "id": "edge_1788181933104_m2swsnr2u",
       "source": "entity_1788128922126_vajq5kdmo",
       "target": "entity_1788128922128_ht4hcsrmf",
       "data": {
         "type": "ONE_TO_MANY",
         "cardinalityFrom": "1",
-        "cardinalityTo": "0..*"
+        "cardinalityTo": "N"
       }
     },
     {
-      "id": "edge_1788128922137_cnk1fp5cp",
+      "id": "edge_1788181933104_lj453s7ro",
       "source": "entity_1788128922123_6g2wt8vq9",
       "target": "entity_1788128922128_ht4hcsrmf",
       "data": {
         "type": "ONE_TO_MANY",
         "cardinalityFrom": "1",
-        "cardinalityTo": "0..*"
+        "cardinalityTo": "N"
       }
     },
     {
-      "id": "edge_1788128922137_dkdxtz1sl",
+      "id": "edge_1788181933105_qw8v44ses",
       "source": "entity_1788128922123_6g2wt8vq9",
       "target": "entity_1788128922132_2ysms6ot0",
       "data": {
         "type": "MANY_TO_ONE",
-        "cardinalityFrom": "0..*",
+        "cardinalityFrom": "N",
         "cardinalityTo": "1"
       }
     }
