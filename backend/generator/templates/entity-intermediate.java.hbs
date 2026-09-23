@@ -1,0 +1,50 @@
+{{! Plantilla de entidad intermedia (clase asociativa UML 2.5). }}
+{{! Se genera para cada relación * a *. NUNCA se usa @ManyToMany: }}
+{{! la intermedia tiene su propio UUID como PK y dos @ManyToOne }}
+{{! hacia las entidades originales, más los atributos propios de la relación. }}
+package com.example.demo.model;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "{{tableName}}")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+public class {{entityNamePascal}} {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", updatable = false, nullable = false)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "{{fromEntitySnake}}_id", nullable = false)
+    private {{fromEntityPascal}} {{fromEntityLower}};
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "{{toEntitySnake}}_id", nullable = false)
+    private {{toEntityPascal}} {{toEntityLower}};
+
+    {{#each attributes}}
+    {{#unless isPk}}
+    @Column(name = "{{nameSnake}}"{{#if unique}}, unique = true{{/if}}{{#unless nullable}}, nullable = false{{/unless}})
+    private {{javaType}} {{nameCamel}};
+    {{/unless}}
+    {{/each}}
+
+    {{! Getters/setters explícitos (no se depende solo de Lombok). }}
+    {{#each accessors}}
+    public {{{javaType}}} get{{capitalize name}}() {
+        return this.{{name}};
+    }
+
+    public void set{{capitalize name}}({{{javaType}}} {{name}}) {
+        this.{{name}} = {{name}};
+    }
+
+    {{/each}}
+}

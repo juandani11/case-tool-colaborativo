@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{baseUrl}}/api/auth/login"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"username\": \"admin\",\r
+
+    \  \"password\": \"admin\"\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: "const response = pm.response.json();\r
+
+      pm.environment.set(\"token\", response.token);"
+    language: text/javascript
+order: 1790022456700

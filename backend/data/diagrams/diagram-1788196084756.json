@@ -1,6 +1,160 @@
 {
   "name": "Diagrama 1788196084756",
-  "nodes": [],
-  "edges": [],
+  "nodes": [
+    {
+      "id": "imp_1788198040327_k3a7v6xdr",
+      "type": "entity",
+      "position": {
+        "x": 130.62559694364853,
+        "y": 103.89780324737347
+      },
+      "data": {
+        "label": "Class1",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    },
+    {
+      "id": "imp_1788198040327_xesvzdcj6",
+      "type": "entity",
+      "position": {
+        "x": 384,
+        "y": 96
+      },
+      "data": {
+        "label": "Class2",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "imp_1788198040327_dvi1u52p3",
+            "name": "id",
+            "type": "int",
+            "isPk": true,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 91
+    },
+    {
+      "id": "imp_1788198040327_iiojxvizf",
+      "type": "entity",
+      "position": {
+        "x": 660,
+        "y": 100
+      },
+      "data": {
+        "label": "Class3",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    },
+    {
+      "id": "imp_1788198040327_maqrcqkwj",
+      "type": "entity",
+      "position": {
+        "x": 940,
+        "y": 100
+      },
+      "data": {
+        "label": "Interface1",
+        "stereotype": "interface",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 93
+    },
+    {
+      "id": "imp_1788198040327_otidufi5o",
+      "type": "entity",
+      "position": {
+        "x": 324.1402479297075,
+        "y": 410.9315492987738
+      },
+      "data": {
+        "label": "Interface2",
+        "stereotype": "interface",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 93
+    },
+    {
+      "id": "imp_1788198040328_rtbm8j5gp",
+      "type": "entity",
+      "position": {
+        "x": 940,
+        "y": 320
+      },
+      "data": {
+        "label": "Factura",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "imp_1788198040328_f040y8nyu",
+            "name": "fechaFactura",
+            "type": "Date",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788198040328_rn6wqfo8g",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788198040328_njhme38jg",
+            "name": "monto",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 127
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1790037791932_za31eqy1d",
+      "source": "imp_1788198040327_k3a7v6xdr",
+      "target": "imp_1788198040327_otidufi5o",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1790038219222_ooy7p5x9g",
+      "source": "imp_1788198040327_xesvzdcj6",
+      "target": "imp_1788198040327_otidufi5o",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    }
+  ],
   "chat": []
 }

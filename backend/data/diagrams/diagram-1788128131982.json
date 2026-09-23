@@ -5,8 +5,8 @@
       "id": "entity_1788128922120_2ute7fn0o",
       "type": "entity",
       "position": {
-        "x": -51.70710027433762,
-        "y": -31.556032931007095
+        "x": -435.8194093911847,
+        "y": 8.71369879454582
       },
       "data": {
         "label": "User",
@@ -45,17 +45,37 @@
             "unique": false
           }
         ],
-        "methods": []
+        "methods": [
+          {
+            "id": "method_1789846700512_e19tu",
+            "name": "nuevoMetodo",
+            "returnType": "void",
+            "visibility": "private",
+            "parameters": [
+              {
+                "name": "param",
+                "type": "String"
+              }
+            ]
+          },
+          {
+            "id": "method_1789846700779_e320u",
+            "name": "nuevoMetodo",
+            "returnType": "void",
+            "visibility": "public",
+            "parameters": []
+          }
+        ]
       },
-      "width": 220,
-      "height": 144
+      "width": 255,
+      "height": 212
     },
     {
       "id": "entity_1788128922123_6g2wt8vq9",
       "type": "entity",
       "position": {
-        "x": 323.1156424356557,
-        "y": 263.19467725943355
+        "x": -71.92919414833048,
+        "y": 162.9660406062955
       },
       "data": {
         "label": "Product",
@@ -97,14 +117,14 @@
         "methods": []
       },
       "width": 220,
-      "height": 144
+      "height": 145
     },
     {
       "id": "entity_1788128922126_vajq5kdmo",
       "type": "entity",
       "position": {
-        "x": -225.34345540516995,
-        "y": 312.3052016792882
+        "x": -382.22723546454006,
+        "y": 389.35245242141445
       },
       "data": {
         "label": "Order",
@@ -146,14 +166,14 @@
         "methods": []
       },
       "width": 220,
-      "height": 144
+      "height": 145
     },
     {
       "id": "entity_1788128922128_ht4hcsrmf",
       "type": "entity",
       "position": {
-        "x": -10.650874778085097,
-        "y": 667.6439963699041
+        "x": -319.6648852206698,
+        "y": 788.2718846965022
       },
       "data": {
         "label": "OrderItem",
@@ -203,14 +223,14 @@
         "methods": []
       },
       "width": 220,
-      "height": 162
+      "height": 163
     },
     {
       "id": "entity_1788128922132_2ysms6ot0",
       "type": "entity",
       "position": {
-        "x": 557.8280706093335,
-        "y": 655.6475335216687
+        "x": 348.6293473316876,
+        "y": 187.23741416232997
       },
       "data": {
         "label": "Category",
@@ -221,7 +241,7 @@
             "name": "id",
             "type": "UUID",
             "isPk": true,
-            "nullable": false,
+            "nullable": true,
             "unique": true
           },
           {
@@ -236,7 +256,7 @@
         "methods": []
       },
       "width": 220,
-      "height": 108
+      "height": 109
     }
   ],
   "edges": [
@@ -288,8 +308,9 @@
       "id": "edge_1788181933103_j13t54a7g",
       "source": "entity_1788128922120_2ute7fn0o",
       "target": "entity_1788128922126_vajq5kdmo",
+      "type": "inheritance",
       "data": {
-        "type": "ONE_TO_MANY",
+        "type": "INHERITANCE",
         "cardinalityFrom": "1",
         "cardinalityTo": "N"
       }
@@ -298,8 +319,9 @@
       "id": "edge_1788181933104_m2swsnr2u",
       "source": "entity_1788128922126_vajq5kdmo",
       "target": "entity_1788128922128_ht4hcsrmf",
+      "type": "aggregation",
       "data": {
-        "type": "ONE_TO_MANY",
+        "type": "AGGREGATION",
         "cardinalityFrom": "1",
         "cardinalityTo": "N"
       }
@@ -308,8 +330,9 @@
       "id": "edge_1788181933104_lj453s7ro",
       "source": "entity_1788128922123_6g2wt8vq9",
       "target": "entity_1788128922128_ht4hcsrmf",
+      "type": "composition",
       "data": {
-        "type": "ONE_TO_MANY",
+        "type": "COMPOSITION",
         "cardinalityFrom": "1",
         "cardinalityTo": "N"
       }
@@ -318,9 +341,21 @@
       "id": "edge_1788181933105_qw8v44ses",
       "source": "entity_1788128922123_6g2wt8vq9",
       "target": "entity_1788128922132_2ysms6ot0",
+      "type": "association",
       "data": {
         "type": "MANY_TO_ONE",
-        "cardinalityFrom": "N",
+        "cardinalityFrom": "*",
+        "cardinalityTo": "*"
+      }
+    },
+    {
+      "id": "edge_1790003221667_t92rb7h7p",
+      "source": "entity_1788128922123_6g2wt8vq9",
+      "target": "entity_1788128922132_2ysms6ot0",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
         "cardinalityTo": "1"
       }
     }

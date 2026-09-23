@@ -1,0 +1,274 @@
+{
+  "name": "Nuevo diagrama",
+  "nodes": [
+    {
+      "id": "entity_1790090273781_2cgv",
+      "type": "entity",
+      "position": {
+        "x": 613.1693589864831,
+        "y": 115.44854640080823
+      },
+      "data": {
+        "label": "Pedido",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790091149677_i12nq",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790091161462_6rrvu",
+            "name": "fecha",
+            "type": "Date",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790091176823_ijw96",
+            "name": "total",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      }
+    },
+    {
+      "id": "entity_1790090274748_sv7s",
+      "type": "entity",
+      "position": {
+        "x": 500.7661359319315,
+        "y": -212.29398416943087
+      },
+      "data": {
+        "label": "Cliente",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790090786229_6ruwd",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790090796279_6lgk4",
+            "name": "email",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790090808143_ey24m",
+            "name": "telefono",
+            "type": "Integer",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      }
+    },
+    {
+      "id": "entity_1790090276550_7me9",
+      "type": "entity",
+      "position": {
+        "x": 238.47229119471,
+        "y": 112.14618719833527
+      },
+      "data": {
+        "label": "Producto",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790090840976_cm6cu",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790090856153_a090e",
+            "name": "nombre",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790091040780_o2nt5",
+            "name": "precio",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      }
+    },
+    {
+      "id": "entity_1790090277637_pqn6",
+      "type": "entity",
+      "position": {
+        "x": -78.46860180543598,
+        "y": 87.64628543475786
+      },
+      "data": {
+        "label": "Empleado",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790090700556_couec",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790090718220_5ce79",
+            "name": "salario",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790090757109_2sfu9",
+            "name": "cargo",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      }
+    },
+    {
+      "id": "entity_1790090410549_m2xpb9nq8",
+      "type": "entity",
+      "position": {
+        "x": 439.454618555122,
+        "y": 316.9776134497511
+      },
+      "data": {
+        "label": "PedidoProducto",
+        "stereotype": "class",
+        "isAssociationClass": true,
+        "associationOf": {
+          "edgeId": "edge_1790090401565_fxpyutxnm",
+          "sourceId": "entity_1790090273781_2cgv",
+          "targetId": "entity_1790090276550_7me9"
+        },
+        "attributes": [
+          {
+            "id": "attr_1790091278130_npool",
+            "name": "cantidad",
+            "type": "Integer",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790091289571_kemrk",
+            "name": "subtotal",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      }
+    },
+    {
+      "id": "entity_1790090441987_tzlk",
+      "type": "entity",
+      "position": {
+        "x": -43.45127191274025,
+        "y": -213.64326293927223
+      },
+      "data": {
+        "label": "Persona",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790090613185_4gasd",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790090637850_49195",
+            "name": "nombre",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790090661266_7oa38",
+            "name": "fechaNacimiento",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1790090334340_q84dh0hwx",
+      "source": "entity_1790090274748_sv7s",
+      "target": "entity_1790090273781_2cgv",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1..*"
+      }
+    },
+    {
+      "id": "edge_1790090401565_fxpyutxnm",
+      "source": "entity_1790090273781_2cgv",
+      "target": "entity_1790090276550_7me9",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "*",
+        "cardinalityTo": "*",
+        "associationClassNodeId": "entity_1790090410549_m2xpb9nq8"
+      }
+    },
+    {
+      "id": "edge_1790090460846_2lrd0pcqy",
+      "source": "entity_1790090441987_tzlk",
+      "target": "entity_1790090277637_pqn6",
+      "type": "inheritance",
+      "data": {
+        "type": "INHERITANCE",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    }
+  ],
+  "chat": []
+}

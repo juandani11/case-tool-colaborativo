@@ -1,35 +1,8 @@
 {{#each entities}}
-CREATE TABLE IF NOT EXISTS {{{safeTableName entityNameCamel}}} (
-    {{#each attributes}}
-    {{name}} {{#if isPk}}{{sqlPkType sqlType isUuid}}{{else}}{{sqlType}}{{/if}}{{#if isPk}} PRIMARY KEY{{/if}}{{#unless nullable}} NOT NULL{{/unless}}{{#if unique}} UNIQUE{{/if}}{{#unless @last}},{{/unless}}
-    {{/each}}
-    {{#each relations}}
-    {{#if (eq jpaType "manyToOne")}}
-    , {{fkColumn}} BIGINT
-    , CONSTRAINT fk_{{../entityNameCamel}}_{{fkColumn}} FOREIGN KEY ({{fkColumn}}) REFERENCES {{{safeTableName otherEntityCamel}}}(id)
-    {{/if}}
-    {{#if (eq jpaType "oneToOne")}}
-    {{#if isOwner}}
-    , {{fkColumn}} BIGINT
-    , CONSTRAINT fk_{{../entityNameCamel}}_{{fkColumn}} FOREIGN KEY ({{fkColumn}}) REFERENCES {{{safeTableName otherEntityCamel}}}(id)
-    {{/if}}
-    {{/if}}
+CREATE TABLE IF NOT EXISTS {{{safeTableName tableName}}} (
+    {{#each sqlColumns}}
+    {{{this}}}{{#unless @last}},{{/unless}}
     {{/each}}
 );
 
-{{/each}}
-{{#each entities}}
-{{#each relations}}
-{{#if (eq jpaType "manyToMany")}}
-{{#if isOwner}}
-CREATE TABLE IF NOT EXISTS {{{safeTableName mtmTableName}}} (
-    {{mtmJoinCol}} BIGINT NOT NULL,
-    {{mtmInverseJoinCol}} BIGINT NOT NULL,
-    PRIMARY KEY ({{mtmJoinCol}}, {{mtmInverseJoinCol}}),
-    CONSTRAINT fk_{{mtmTableName}}_{{mtmJoinCol}} FOREIGN KEY ({{mtmJoinCol}}) REFERENCES {{{safeTableName ../entityNameCamel}}}(id),
-    CONSTRAINT fk_{{mtmTableName}}_{{mtmInverseJoinCol}} FOREIGN KEY ({{mtmInverseJoinCol}}) REFERENCES {{{safeTableName otherEntityCamel}}}(id)
-);
-{{/if}}
-{{/if}}
-{{/each}}
 {{/each}}

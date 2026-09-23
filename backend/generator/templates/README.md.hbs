@@ -86,7 +86,7 @@ Respuesta:
 Incluye el token en el header `Authorization` de cada peticion protegida:
 
 ```bash
-curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entities)}} \
+curl -X GET http://localhost:8080/api/{{firstRoute}} \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -107,12 +107,12 @@ curl -X GET http://localhost:8080/api/{{pluralLowerCase (firstEntityName entitie
 
 | Metodo | URL | Descripcion |
 |--------|-----|-------------|
-| GET    | `/api/{{pluralLowerCase entityName}}` | Listar todos (paginado) |
-| GET    | `/api/{{pluralLowerCase entityName}}/all` | Listar todos (sin paginacion) |
-| GET    | `/api/{{pluralLowerCase entityName}}/{id}` | Obtener por ID |
-| POST   | `/api/{{pluralLowerCase entityName}}` | Crear nuevo registro |
-| PUT    | `/api/{{pluralLowerCase entityName}}/{id}` | Actualizar registro |
-| DELETE | `/api/{{pluralLowerCase entityName}}/{id}` | Eliminar registro |
+| GET    | `/api/{{route}}` | Listar todos (paginado) |
+| GET    | `/api/{{route}}/all` | Listar todos (sin paginacion) |
+| GET    | `/api/{{route}}/{id}` | Obtener por ID |
+| POST   | `/api/{{route}}` | Crear nuevo registro |
+| PUT    | `/api/{{route}}/{id}` | Actualizar registro |
+| DELETE | `/api/{{route}}/{id}` | Eliminar registro |
 
 **Campos del DTO:**
 {{#each attributes}}
@@ -260,32 +260,32 @@ Write-Output "Token: $token"
 > **Nota:** Los IDs en los ejemplos usan `<uuid>` como placeholder. Reemplazalo con el UUID real al probar.
 
 {{#each entities}}
-### {{entityNamePascal}} (`/api/{{pluralLowerCase entityName}}`)
+### {{entityNamePascal}} (`/api/{{route}}`)
 
 ```bash
 # Listar (paginado)
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{route}}
 
 # Listar todos
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/all
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{route}}/all
 
 # Crear
-curl -X POST http://localhost:8080/api/{{pluralLowerCase entityName}} \
+curl -X POST http://localhost:8080/api/{{route}} \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{{{jsonExample this}}}'
 
 # Obtener por ID
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<uuid>
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{route}}/<uuid>
 
 # Actualizar
-curl -X PUT http://localhost:8080/api/{{pluralLowerCase entityName}}/<uuid> \
+curl -X PUT http://localhost:8080/api/{{route}}/<uuid> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{{{jsonExample this}}}'
 
 # Eliminar
-curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{pluralLowerCase entityName}}/<uuid>
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/{{route}}/<uuid>
 ```
 
 {{/each}}

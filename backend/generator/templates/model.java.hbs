@@ -1,5 +1,6 @@
 package com.example.demo.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
@@ -7,13 +8,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "{{entityNameCamel}}")
+@Table(name = "{{tableName}}")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-{{#if inheritance}}
+{{#if inheritance.isRoot}}
 @Inheritance(strategy = InheritanceType.JOINED)
 @DiscriminatorColumn(name = "dtype")
 {{/if}}
-public class {{entityNamePascal}} {{#if inheritance}}extends {{inheritance.parentEntityPascal}}{{/if}} {
+{{#if inheritance.parentEntity}}
+@PrimaryKeyJoinColumn(name = "id")
+{{/if}}
+public class {{entityNamePascal}} {{#if inheritance.parentEntity}}extends {{inheritance.parentEntityPascal}}{{/if}} {
 
     {{#if primaryKey.isUuid}}
     @Id
@@ -29,8 +33,12 @@ public class {{entityNamePascal}} {{#if inheritance}}extends {{inheritance.paren
 
     {{#each attributes}}
     {{#unless isPk}}
+    {{! Si colisiona con el @JoinColumn de una relación, la relación es la }}
+    {{! fuente de verdad y este atributo NO se mapea (evita "Column duplicated"). }}
+    {{#unless isFkCollision}}
     @Column(name = "{{nameSnake}}"{{#if unique}}, unique = true{{/if}}{{#unless nullable}}, nullable = false{{/unless}})
     private {{javaType}} {{nameCamel}};
+    {{/unless}}
     {{/unless}}
     {{/each}}
 
@@ -42,7 +50,7 @@ public class {{entityNamePascal}} {{#if inheritance}}extends {{inheritance.paren
 
 {{/if}}
 {{#if (eq jpaType "oneToMany")}}
-    @OneToMany(mappedBy = "{{fieldLabel}}", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "{{mappedBy}}", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private Set<{{otherEntityPascal}}> {{fieldLabelPlural}} = new HashSet<>();
 
@@ -57,19 +65,21 @@ public class {{entityNamePascal}} {{#if inheritance}}extends {{inheritance.paren
     private {{otherEntityPascal}} {{fieldLabel}};
 
 {{/if}}
-{{#if (eq jpaType "manyToMany")}}
-    {{#if isOwner}}
-    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "{{mtmTableName}}",
-        joinColumns = @JoinColumn(name = "{{mtmJoinCol}}"),
-        inverseJoinColumns = @JoinColumn(name = "{{mtmInverseJoinCol}}")
-    )
-    {{else}}
-    @ManyToMany(mappedBy = "{{mappedBy}}", fetch = FetchType.LAZY)
-    {{/if}}
-    private Set<{{otherEntityPascal}}> {{fieldLabelPlural}} = new HashSet<>();
-
-{{/if}}
+{{! NOTA: no se genera @ManyToMany en ningún caso. Las relaciones * a * }}
+{{! se expanden a entidad intermedia explícita (ver expandManyToMany en }}
+{{! generate.js y entity-intermediate.java.hbs). }}
 {{/each}}
+
+    {{! Getters/setters explícitos (no se depende solo de Lombok). }}
+    {{! allFields = PK + atributos + campos de relaciones. }}
+    {{#each accessors}}
+    public {{{javaType}}} get{{capitalize name}}() {
+        return this.{{name}};
+    }
+
+    public void set{{capitalize name}}({{{javaType}}} {{name}}) {
+        this.{{name}} = {{name}};
+    }
+
+    {{/each}}
 }

@@ -34,23 +34,37 @@ public class {{entityNamePascal}}DTO {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private {{otherEntityPascal}}DTO {{fieldLabel}};
 
+    {{! Si el diagrama ya trae un atributo con este nombre (ej. "customerId"), }}
+    {{! se reutiliza y NO se declara dos veces. }}
+    {{#unless dtoFkTaken}}
     private {{otherEntityPkType}} {{fieldLabel}}Id;
+    {{/unless}}
     {{/if}}
     {{#if (eq jpaType "oneToOne")}}
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private {{otherEntityPascal}}DTO {{fieldLabel}};
 
+    {{#unless dtoFkTaken}}
     private {{otherEntityPkType}} {{fieldLabel}}Id;
+    {{/unless}}
     {{/if}}
     {{#if (eq jpaType "oneToMany")}}
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private List<{{otherEntityPascal}}DTO> {{fieldLabelPlural}} = new java.util.ArrayList<>();
     {{/if}}
-    {{#if (eq jpaType "manyToMany")}}
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-    private List<{{otherEntityPascal}}DTO> {{fieldLabelPlural}} = new java.util.ArrayList<>();
+    {{! NOTA: sin bloque manyToMany. Las relaciones * a * viajan como }}
+    {{! entidad intermedia con sus dos @ManyToOne (fromId/toId). }}
+    {{/each}}
 
-    private List<{{otherEntityPkType}}> {{fieldLabelPlural}}Ids = new java.util.ArrayList<>();
-    {{/if}}
+    {{! Getters/setters explícitos (no se depende solo de Lombok). }}
+    {{#each dtoAccessors}}
+    public {{{javaType}}} get{{capitalize name}}() {
+        return this.{{name}};
+    }
+
+    public void set{{capitalize name}}({{{javaType}}} {{name}}) {
+        this.{{name}} = {{name}};
+    }
+
     {{/each}}
 }

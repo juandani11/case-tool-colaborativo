@@ -1,0 +1,40 @@
+{
+  "apiBaseUrl": "http://localhost:8080",
+  "entidades": [
+    "Pedido",
+    "Cliente",
+    "Producto",
+    "Empleado",
+    "Persona",
+    "PedidoProducto"
+  ],
+  "campos": {
+    "Pedido": [
+      "clienteId",
+      "fecha",
+      "total"
+    ],
+    "Cliente": [
+      "email",
+      "telefono"
+    ],
+    "Producto": [
+      "nombre",
+      "precio"
+    ],
+    "Empleado": [
+      "salario",
+      "cargo"
+    ],
+    "Persona": [
+      "nombre",
+      "fechaNacimiento"
+    ],
+    "PedidoProducto": [
+      "pedidoId",
+      "productoId",
+      "cantidad",
+      "subtotal"
+    ]
+  }
+}

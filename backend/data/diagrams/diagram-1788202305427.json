@@ -1,0 +1,300 @@
+{
+  "name": "Diagrama 1788202305427",
+  "nodes": [
+    {
+      "id": "imp_1788202699451_bfqvrn6p4",
+      "type": "entity",
+      "position": {
+        "x": 100,
+        "y": 100
+      },
+      "data": {
+        "label": "Asset_Types",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "imp_1788202699451_7blzawm2n",
+            "name": "asset_type_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_dxy7wcgbe",
+            "name": "asset_type_description",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 109
+    },
+    {
+      "id": "imp_1788202699451_1zu2wjzso",
+      "type": "entity",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "data": {
+        "label": "IT_Assets",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "imp_1788202699451_mq0k2pkfd",
+            "name": "asset_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_2i25pxlzj",
+            "name": "asset_type_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_iix4loft1",
+            "name": "description",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_36yw2md1v",
+            "name": "other_details",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 145
+    },
+    {
+      "id": "imp_1788202699451_9t4fu6d47",
+      "type": "entity",
+      "position": {
+        "x": 660,
+        "y": 100
+      },
+      "data": {
+        "label": "Employee_Assets",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "imp_1788202699451_4q8pq5yqn",
+            "name": "asset_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_kx8549u2r",
+            "name": "employee_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_bsepvbyc3",
+            "name": "date_out",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_9x0bh6ukn",
+            "name": "date_returned",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_gksw5xsqd",
+            "name": "condition_out",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_viheqxrte",
+            "name": "condition_returned",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_5o8atj418",
+            "name": "other_details",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 199
+    },
+    {
+      "id": "imp_1788202699451_igur75ngn",
+      "type": "entity",
+      "position": {
+        "x": 940,
+        "y": 100
+      },
+      "data": {
+        "label": "Employees",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "imp_1788202699451_wgd7a59y1",
+            "name": "employee_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_p6zupv5mz",
+            "name": "first_name",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_xuhbfgsur",
+            "name": "last_name",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_fkd58nsvn",
+            "name": "department",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_sta7ugptf",
+            "name": "extension",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_o7eq8szv2",
+            "name": "email_address",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_ubvzsb0ov",
+            "name": "other_details",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 199
+    },
+    {
+      "id": "imp_1788202699451_kpvy2kl3a",
+      "type": "entity",
+      "position": {
+        "x": 100,
+        "y": 320
+      },
+      "data": {
+        "label": "IT_Asset_Inventory",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "imp_1788202699451_fskhcs628",
+            "name": "it_asset_inventory_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_sxyqj9c7f",
+            "name": "asset_id",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_nyq3e4xb0",
+            "name": "inventory_date",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_gavzvxy9a",
+            "name": "number_assigned",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_64l24itbn",
+            "name": "number_in_stock",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "imp_1788202699451_bpajx79ll",
+            "name": "other_details",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 181
+    }
+  ],
+  "edges": [],
+  "chat": []
+}

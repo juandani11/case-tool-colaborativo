@@ -47,7 +47,9 @@ public class {{entityNamePascal}}Service {
         dto.set{{primaryKey.namePascal}}(entity.get{{primaryKey.namePascal}}());
         {{#each attributes}}
         {{#unless isPk}}
+        {{#unless isFkCollision}}
         dto.set{{namePascal}}(entity.get{{namePascal}}());
+        {{/unless}}
         {{/unless}}
         {{/each}}
         return dto;
@@ -57,7 +59,9 @@ public class {{entityNamePascal}}Service {
         {{entityNamePascal}} entity = new {{entityNamePascal}}();
         {{#each attributes}}
         {{#unless isPk}}
+        {{#unless isFkCollision}}
         entity.set{{namePascal}}(dto.get{{namePascal}}());
+        {{/unless}}
         {{/unless}}
         {{/each}}
         return entity;

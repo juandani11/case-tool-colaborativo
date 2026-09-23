@@ -1,0 +1,339 @@
+{
+  "name": "Diagrama 1790004303244",
+  "nodes": [
+    {
+      "id": "entity_1790004441592_svg0bb7zp",
+      "type": "entity",
+      "position": {
+        "x": -634.7985562452347,
+        "y": -153.10748974275253
+      },
+      "data": {
+        "label": "User",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790004441592_0_ni8nb",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790004441592_1_ispvp",
+            "name": "email",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790004441592_2_38kqk",
+            "name": "password",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441592_3_5t8b7",
+            "name": "lastLogin",
+            "type": "Date",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 145
+    },
+    {
+      "id": "entity_1790004441593_y1seyfvb0",
+      "type": "entity",
+      "position": {
+        "x": -289.5988717872938,
+        "y": -163.08841193606833
+      },
+      "data": {
+        "label": "Customer",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790004441593_0_9kqjp",
+            "name": "name",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_1_8e2f2",
+            "name": "billingAddress",
+            "type": "String",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_2_wtg46",
+            "name": "defaultShippingAddress",
+            "type": "String",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 127
+    },
+    {
+      "id": "entity_1790004441593_hfcugo8vb",
+      "type": "entity",
+      "position": {
+        "x": -391.0260850337235,
+        "y": 190.38087316134425
+      },
+      "data": {
+        "label": "Shopping Cart",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790004441593_0_mlykj",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790004441593_1_gdzff",
+            "name": "productId",
+            "type": "UUID",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 109
+    },
+    {
+      "id": "entity_1790004441593_ztjqlu041",
+      "type": "entity",
+      "position": {
+        "x": 72.41259973669167,
+        "y": -163.9377268711388
+      },
+      "data": {
+        "label": "Orders",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790004441593_0_rxp89",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790004441593_1_ysnhf",
+            "name": "customerId",
+            "type": "UUID",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_2_6djbw",
+            "name": "orderDate",
+            "type": "Date",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_3_1cpjv",
+            "name": "status",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_4_1y0tc",
+            "name": "price",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 163
+    },
+    {
+      "id": "entity_1790004441593_smviewubl",
+      "type": "entity",
+      "position": {
+        "x": 33.11060875956116,
+        "y": 147.05344518649156
+      },
+      "data": {
+        "label": "Order Details",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790004441593_0_409lj",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790004441593_1_kjn4b",
+            "name": "orderId",
+            "type": "UUID",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_2_b8wuh",
+            "name": "shippingAddress",
+            "type": "String",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_3_db9qa",
+            "name": "shippingType",
+            "type": "String",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_4_7md9d",
+            "name": "shippingCost",
+            "type": "BigDecimal",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_5_aj8fe",
+            "name": "billingAddress",
+            "type": "String",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          },
+          {
+            "id": "attr_1790004441593_6_g6q81",
+            "name": "createdDate",
+            "type": "Date",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 199
+    },
+    {
+      "id": "entity_1790027268599_u1kz2bopj",
+      "type": "entity",
+      "position": {
+        "x": -392.57757463129974,
+        "y": -361.1042705447581
+      },
+      "data": {
+        "label": "UserCustomer",
+        "stereotype": "class",
+        "isAssociationClass": true,
+        "associationOf": {
+          "sourceId": "entity_1790004441592_svg0bb7zp",
+          "targetId": "entity_1790004441593_y1seyfvb0",
+          "type": "ASSOCIATION",
+          "cardinalityFrom": "*",
+          "cardinalityTo": "*"
+        },
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 92
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1790004441593_z6rbvsofv",
+      "source": "entity_1790004441593_y1seyfvb0",
+      "target": "entity_1790004441593_hfcugo8vb",
+      "type": "association",
+      "data": {
+        "type": "ONE_TO_MANY",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "0..*",
+        "intermediateAttributes": []
+      }
+    },
+    {
+      "id": "edge_1790004441593_54666ubs5",
+      "source": "entity_1790004441593_y1seyfvb0",
+      "target": "entity_1790004441593_ztjqlu041",
+      "type": "association",
+      "data": {
+        "type": "ONE_TO_MANY",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "0..*",
+        "intermediateAttributes": []
+      }
+    },
+    {
+      "id": "edge_1790004441594_acvz2eln2",
+      "source": "entity_1790004441593_ztjqlu041",
+      "target": "entity_1790004441593_smviewubl",
+      "type": "association",
+      "data": {
+        "type": "ONE_TO_ONE",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1",
+        "intermediateAttributes": []
+      }
+    },
+    {
+      "id": "assoclink_1790027268601_mm1oht7tm",
+      "source": "entity_1790027268599_u1kz2bopj",
+      "target": "entity_1790004441592_svg0bb7zp",
+      "type": "dashed",
+      "data": {
+        "isAssociationClassLink": true
+      }
+    },
+    {
+      "id": "assoclink_1790027268602_7se7tumkp",
+      "source": "entity_1790027268599_u1kz2bopj",
+      "target": "entity_1790004441593_y1seyfvb0",
+      "type": "dashed",
+      "data": {
+        "isAssociationClassLink": true
+      }
+    }
+  ],
+  "chat": []
+}

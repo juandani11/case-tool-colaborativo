@@ -1,0 +1,176 @@
+{
+  "name": "Prueba",
+  "nodes": [
+    {
+      "id": "entity_1790042755250_s4rji29t1",
+      "type": "entity",
+      "position": {
+        "x": 761.2128826629928,
+        "y": -85.89013838087536
+      },
+      "data": {
+        "label": "NuevaEntidad",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    },
+    {
+      "id": "entity_1790042761338_ll5ghu5ds",
+      "type": "entity",
+      "position": {
+        "x": 441.02364886528517,
+        "y": 301.2479510853184
+      },
+      "data": {
+        "label": "NuevaEntidad",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    },
+    {
+      "id": "entity_1790045100292_n6gzqn6ij",
+      "type": "entity",
+      "position": {
+        "x": 251.61427160762003,
+        "y": -234.6293255316228
+      },
+      "data": {
+        "label": "EntidadAleatoria",
+        "stereotype": "class",
+        "attributes": [
+          {
+            "id": "attr_1790045100292_0_eco8d",
+            "name": "id",
+            "type": "UUID",
+            "isPk": true,
+            "nullable": false,
+            "unique": true
+          },
+          {
+            "id": "attr_1790045100292_1_ntvmr",
+            "name": "nombre",
+            "type": "String",
+            "isPk": false,
+            "nullable": false,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 109
+    },
+    {
+      "id": "entity_1790049207408_l7g8",
+      "type": "entity",
+      "position": {
+        "x": 198.23017838743056,
+        "y": 90.95293685490171
+      },
+      "data": {
+        "label": "NuevaClase",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    },
+    {
+      "id": "entity_1790050542141_rn2ipsvig",
+      "type": "entity",
+      "position": {
+        "x": 793.7846724075881,
+        "y": 236.4304546313689
+      },
+      "data": {
+        "label": "NuevaEntidadNuevaEntidad",
+        "stereotype": "class",
+        "isAssociationClass": true,
+        "associationOf": {
+          "edgeId": "edge_1790049976942_9uu8t4xmr",
+          "sourceId": "entity_1790042755250_s4rji29t1",
+          "targetId": "entity_1790042761338_ll5ghu5ds"
+        },
+        "attributes": [
+          {
+            "id": "attr_1790087683572_7t5pf",
+            "name": "nuevoAtributo",
+            "type": "String",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          }
+        ],
+        "methods": []
+      },
+      "width": 220,
+      "height": 110
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1790049932687_an0npd3n0",
+      "source": "entity_1790042755250_s4rji29t1",
+      "target": "entity_1790049207408_l7g8",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1790049958277_iiu5ytm4x",
+      "source": "entity_1790045100292_n6gzqn6ij",
+      "target": "entity_1790042755250_s4rji29t1",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1790049969568_2hk1smrva",
+      "source": "entity_1790049207408_l7g8",
+      "target": "entity_1790042761338_ll5ghu5ds",
+      "type": "aggregation",
+      "data": {
+        "type": "AGGREGATION",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    },
+    {
+      "id": "edge_1790049976942_9uu8t4xmr",
+      "source": "entity_1790042755250_s4rji29t1",
+      "target": "entity_1790042761338_ll5ghu5ds",
+      "type": "association",
+      "data": {
+        "type": "ASSOCIATION",
+        "cardinalityFrom": "*",
+        "cardinalityTo": "*",
+        "associationClassNodeId": "entity_1790050542141_rn2ipsvig"
+      }
+    },
+    {
+      "id": "edge_1790087640923_mo4k3zgbb",
+      "source": "entity_1790045100292_n6gzqn6ij",
+      "target": "entity_1790049207408_l7g8",
+      "type": "inheritance",
+      "data": {
+        "type": "INHERITANCE",
+        "cardinalityFrom": "1",
+        "cardinalityTo": "1"
+      }
+    }
+  ],
+  "chat": []
+}

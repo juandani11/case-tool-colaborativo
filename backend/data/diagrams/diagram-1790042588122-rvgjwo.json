@@ -1,0 +1,39 @@
+{
+  "name": "Nuevo diagrama",
+  "nodes": [
+    {
+      "id": "entity_1790088275021_xviu",
+      "type": "entity",
+      "position": {
+        "x": -201.5,
+        "y": -77.00000000000003
+      },
+      "data": {
+        "label": "NuevaClase",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    },
+    {
+      "id": "entity_1790088276638_nbl6",
+      "type": "entity",
+      "position": {
+        "x": 152.5,
+        "y": -88.75000000000003
+      },
+      "data": {
+        "label": "NuevaClase",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
+    }
+  ],
+  "edges": [],
+  "chat": []
+}

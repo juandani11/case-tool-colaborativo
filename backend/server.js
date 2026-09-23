@@ -8,6 +8,11 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { generateProject } = require('./generator/generate');
+const authRoutes = require('./routes/auth');
+const { requireAuth, verifyToken, authEnabled } = require('./middleware/auth');
+const aclRoutes = require('./routes/acl');
+const aclService = require('./services/aclService');
+const { requireDiagramMember, requireDiagramRole, requireDiagramWrite } = require('./middleware/diagramAuth');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -18,13 +23,86 @@ app.use(express.json());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Conexión WebSocket para colaboración
-wss.on('connection', (ws, req) => {
+// Conexión WebSocket para colaboración (Fase 2A: validación real por diagrama).
+// El room sigue la convención `diagram-room-<diagramId>` del frontend.
+// Sin token o sin rol en el diagrama: se cierra (4401/4403).
+// Con AUTH_ENABLED=false: todo abierto como antes.
+wss.on('connection', async (ws, req) => {
+  if (authEnabled()) {
+    let url;
+    try {
+      url = new URL(req.url || '/', 'http://localhost');
+    } catch {
+      ws.close(4401, 'URL inválida');
+      return;
+    }
+    const roomName = (url.pathname || '').replace(/^\//, '');
+    const token = url.searchParams.get('token');
+    if (!token) {
+      ws.close(4401, 'Token requerido');
+      return;
+    }
+    const payload = verifyToken(token);
+    if (!payload) {
+      ws.close(4401, 'Token inválido');
+      return;
+    }
+    // Mapear room -> diagramId según la convención del frontend
+    const prefix = 'diagram-room-';
+    const diagramId = roomName.startsWith(prefix) ? roomName.slice(prefix.length) : null;
+    if (!diagramId) {
+      ws.close(4403, 'Sala desconocida');
+      return;
+    }
+    try {
+      // Migración: legacy sin ACL -> el primero que entra es OWNER
+      await aclService.getOrCreateACL(diagramId, payload.userId);
+      const role = await aclService.getRoleForUser(diagramId, payload.userId);
+      if (role === 'NONE') {
+        ws.close(4403, 'Sin acceso a este diagrama');
+        return;
+      }
+      ws.userId = payload.userId;
+      ws.username = payload.username;
+      ws.userRole = role;
+    } catch (err) {
+      console.error('Error validando WS:', err);
+      ws.close(4500, 'Error interno');
+      return;
+    }
+  } else {
+    // Fase 1: adjuntar sin bloquear
+    try {
+      const url = new URL(req.url || '/', 'http://localhost');
+      const token = url.searchParams.get('token');
+      if (token) {
+        const payload = verifyToken(token);
+        if (payload) {
+          ws.userId = payload.userId;
+          ws.username = payload.username;
+        }
+      }
+    } catch {
+      // Nunca romper la colaboración por un query malformado
+    }
+  }
   setupWSConnection(ws, req);
 });
 
-// Endpoint de salud
+// Endpoint de salud (siempre público)
 app.get('/health', (req, res) => res.send('OK'));
+
+// Rutas de autenticación (siempre públicas)
+app.use('/api/auth', authRoutes);
+
+// Gestión de miembros por diagrama (montado antes que /api/diagrams/:id;
+// sus rutas tienen 2 segmentos y no colisionan, pero el orden es explícito)
+app.use('/api', aclRoutes);
+
+// Listado (owned/shared) y creación para el dashboard.
+// Reemplaza al antiguo GET array: devuelve { owned, shared }.
+const diagramsRoutes = require('./routes/diagrams');
+app.use('/api', diagramsRoutes);
 
 // ── Diagram persistence ─────────────────────────────────────────────
 const DIAGRAMS_DIR = path.join(__dirname, 'data', 'diagrams');
@@ -36,35 +114,7 @@ function diagramPath(id) {
   return path.join(DIAGRAMS_DIR, `${safe}.json`);
 }
 
-app.get('/api/diagrams', (_req, res) => {
-  try {
-    if (!fs.existsSync(DIAGRAMS_DIR)) {
-      return res.json([]);
-    }
-    const files = fs.readdirSync(DIAGRAMS_DIR).filter(f => f.endsWith('.json'));
-    const diagrams = files.map(f => {
-      const id = f.replace(/\.json$/, '');
-      try {
-        const filePath = path.join(DIAGRAMS_DIR, f);
-        const stat = fs.statSync(filePath);
-        let name = `Diagrama ${id.replace(/^diagram-/, '')}`;
-        try {
-          const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-          if (data.name) name = data.name;
-        } catch {}
-        return { id, name, updatedAt: stat.mtimeMs };
-      } catch {
-        return { id, name: `Diagrama ${id.replace(/^diagram-/, '')}`, updatedAt: 0 };
-      }
-    });
-    res.json(diagrams);
-  } catch (err) {
-    console.error('Error listing diagrams:', err);
-    res.status(500).json({ error: 'Error listing diagrams' });
-  }
-});
-
-app.get('/api/diagrams/:id', (req, res) => {
+app.get('/api/diagrams/:id', requireAuth, requireDiagramMember, (req, res) => {
   const filePath = diagramPath(req.params.id);
   if (!fs.existsSync(filePath)) {
     const fallbackName = `Diagrama ${req.params.id.replace(/^diagram-/, '')}`;
@@ -82,7 +132,7 @@ app.get('/api/diagrams/:id', (req, res) => {
   }
 });
 
-app.post('/api/diagrams/:id', (req, res) => {
+app.post('/api/diagrams/:id', requireAuth, requireDiagramWrite, (req, res) => {
   const { name, nodes, edges, chat } = req.body;
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
     return res.status(400).json({ error: 'nodes and edges arrays are required' });
@@ -106,7 +156,7 @@ app.post('/api/diagrams/:id', (req, res) => {
   }
 });
 
-app.put('/api/diagrams/:id/rename', (req, res) => {
+app.put('/api/diagrams/:id/rename', requireAuth, requireDiagramWrite, (req, res) => {
   const { name } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name is required' });
@@ -126,13 +176,14 @@ app.put('/api/diagrams/:id/rename', (req, res) => {
   }
 });
 
-app.delete('/api/diagrams/:id', (req, res) => {
+app.delete('/api/diagrams/:id', requireAuth, requireDiagramRole('OWNER'), async (req, res) => {
   const filePath = diagramPath(req.params.id);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'Diagram not found' });
   }
   try {
     fs.unlinkSync(filePath);
+    await aclService.deleteACL(req.params.id);
     res.status(204).send();
   } catch (err) {
     console.error('Error deleting diagram:', err);
@@ -141,7 +192,7 @@ app.delete('/api/diagrams/:id', (req, res) => {
 });
 
 // Endpoint de IA
-app.post('/api/ai/command', async (req, res) => {
+app.post('/api/ai/command', requireAuth, async (req, res) => {
   const { command, currentState } = req.body;
 
   if (!command || !currentState) {
@@ -161,7 +212,7 @@ app.post('/api/ai/command', async (req, res) => {
 });
 
 // Endpoint de transcripción de voz (Whisper)
-app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
+app.post('/api/ai/transcribe', requireAuth, upload.single('audio'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No se envió archivo de audio' });
   }
@@ -202,7 +253,7 @@ app.post('/api/ai/transcribe', upload.single('audio'), async (req, res) => {
 });
 
 // Endpoint de generación de diagrama desde imagen (LLaVA)
-app.post('/api/ai/from-image', upload.single('image'), async (req, res) => {
+app.post('/api/ai/from-image', requireAuth, upload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No se envió imagen' });
   }
@@ -227,7 +278,7 @@ app.post('/api/ai/from-image', upload.single('image'), async (req, res) => {
 });
 
 // Endpoint de generación de backend (asíncrono)
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', requireAuth, async (req, res) => {
   const { currentState } = req.body;
 
   if (!currentState || !currentState.entities || currentState.entities.length === 0) {

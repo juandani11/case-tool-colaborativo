@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{baseUrl}}/api/customers?Authorization=Bearer {{token}}"
+method: POST
+queryParams:
+  - key: Authorization
+    value: Bearer {{token}}
+    disabled: false
+    description: ""
+body:
+  type: json
+  content: "{\r
+
+    \  \"name\": \"Juan Pérez\",\r
+
+    \  \"billingAddress\": \"Av. Siempre Viva 123\",\r
+
+    \  \"defaultShippingAddress\": \"Av. Siempre Viva 123\"\r
+
+    }"
+auth:
+  type: noauth
+order: 3961929628099787
