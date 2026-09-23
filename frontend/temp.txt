@@ -1,0 +1,391 @@
+﻿'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
+import { Node, Edge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
+import { EntityNodeData, RelationshipData } from '../types/diagram';
+type EdgeData = {
+  id: string;
+  source: string;
+  target: string;
+  data?: {
+    type?: string;
+    cardinalityFrom?: string;
+    cardinalityTo?: string;
+  };
+  type?: string;
+};
+
+type YNodeMap = Y.Map<any>;
+type YEdgeMap = Y.Map<any>;
+
+export function useCollaborativeFlow(roomName: string) {
+  const [nodes, setNodes] = useState<Node<EntityNodeData>[]>([]);
+  const [edges, setEdges] = useState<Edge<RelationshipData>[]>([]);
+  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
+  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
+  const [yNodes, setYNodes] = useState<Y.Map<YNodeMap> | null>(null);
+  const [yEdges, setYEdges] = useState<Y.Map<YEdgeMap> | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Inicializar Y.Doc y proveedor WebSocket
+  useEffect(() => {
+    const doc = new Y.Doc();
+    const wsProvider = new WebsocketProvider(
+      process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:1234',
+      roomName,
+      doc
+    );
+
+    setYdoc(doc);
+    setProvider(wsProvider);
+    setYNodes(doc.getMap('nodes'));
+    setYEdges(doc.getMap('edges'));
+
+    wsProvider.on('status', (event: any) => {
+      setIsConnected(event.status === 'connected');
+    });
+
+    return () => {
+      wsProvider.disconnect();
+      doc.destroy();
+    };
+  }, [roomName]);
+
+  // Convertir Y.Map de nodos a array de React Flow
+  const nodesToArray = useCallback((map: Y.Map<YNodeMap>): Node<EntityNodeData>[] => {
+    const result: Node<EntityNodeData>[] = [];
+    map.forEach((nodeMap, id) => {
+      const node = nodeMap.toJSON() as Node<EntityNodeData>;
+      result.push(node);
+    });
+    return result;
+  }, []);
+
+  // Convertir Y.Map de aristas a array de React Flow
+  const edgesToArray = useCallback((map: Y.Map<YEdgeMap>): Edge<RelationshipData>[] => {
+    const result: Edge<RelationshipData>[] = [];
+    map.forEach((edgeMap, id) => {
+      const edge = edgeMap.toJSON() as Edge<RelationshipData>;
+      result.push(edge);
+    });
+    return result;
+  }, []);
+
+  // Observar cambios profundos y actualizar estado local
+  useEffect(() => {
+    if (!yNodes || !yEdges) return;
+
+    const updateState = () => {
+      setNodes(nodesToArray(yNodes));
+      setEdges(edgesToArray(yEdges));
+    };
+
+    yNodes.observeDeep(updateState);
+    yEdges.observeDeep(updateState);
+    updateState(); // Llamada inicial
+
+    return () => {
+      yNodes.unobserveDeep(updateState);
+      yEdges.unobserveDeep(updateState);
+    };
+  }, [yNodes, yEdges, nodesToArray, edgesToArray]);
+
+  // AÃ±adir nodo al mapa colaborativo
+  const addNode = useCallback((node: Node<EntityNodeData>) => {
+    if (!yNodes) return;
+    const nodeMap = new Y.Map();
+    nodeMap.set('id', node.id);
+    nodeMap.set('type', node.type || 'entity');
+    // Guardar position como Y.Map
+    const posMap = new Y.Map();
+    posMap.set('x', node.position.x);
+    posMap.set('y', node.position.y);
+    nodeMap.set('position', posMap);
+    // Guardar data como Y.Map (label, attributes, methods y stereotype)
+    const dataMap = new Y.Map();
+    dataMap.set('label', node.data.label);
+    dataMap.set('stereotype', node.data.stereotype || 'class');
+    // Attributes como Y.Array de Y.Map
+    const attrsArray = new Y.Array();
+    (node.data.attributes || []).forEach(attr => {
+      const attrMap = new Y.Map();
+      Object.entries(attr).forEach(([key, value]) => attrMap.set(key, value));
+      attrsArray.push([attrMap]);
+    });
+    dataMap.set('attributes', attrsArray);
+    // Methods como Y.Array de Y.Map
+    const methodsArray = new Y.Array();
+    (node.data.methods || []).forEach(method => {
+      const methodMap = new Y.Map();
+      Object.entries(method).forEach(([key, value]) => methodMap.set(key, value));
+      // Create parameters array first, populate it, then set on methodMap
+      const paramsArray = new Y.Array();
+      (method.parameters || []).forEach(param => {
+        const paramMap = new Y.Map();
+        Object.entries(param).forEach(([key, value]) => paramMap.set(key, value));
+        paramsArray.push([paramMap]);
+      });
+      methodMap.set('parameters', paramsArray);
+      methodsArray.push([methodMap]);
+    });
+    dataMap.set('methods', methodsArray);
+    nodeMap.set('data', dataMap);
+    yNodes.set(node.id, nodeMap);
+  }, [yNodes]);
+
+  // Actualizar nodo (posiciÃ³n, datos, etc.)
+  const updateNode = useCallback((id: string, changes: Partial<Node<EntityNodeData>>) => {
+    if (!yNodes) return;
+    const nodeMap = yNodes.get(id);
+    if (!nodeMap) return;
+
+    if (changes.position) {
+      const posMap = nodeMap.get('position') as Y.Map<number>;
+      if (posMap) {
+        posMap.set('x', changes.position.x);
+        posMap.set('y', changes.position.y);
+      } else {
+        const newPosMap = new Y.Map();
+        newPosMap.set('x', changes.position.x);
+        newPosMap.set('y', changes.position.y);
+        nodeMap.set('position', newPosMap);
+      }
+    }
+
+    if (changes.data) {
+      const dataMap = new Y.Map();
+      dataMap.set('label', changes.data.label);
+      dataMap.set('stereotype', changes.data.stereotype || 'class');
+      const attrsArray = new Y.Array();
+      (changes.data.attributes || []).forEach(attr => {
+        const attrMap = new Y.Map();
+        Object.entries(attr).forEach(([key, value]) => attrMap.set(key, value));
+        attrsArray.push([attrMap]);
+      });
+      dataMap.set('attributes', attrsArray);
+      const methodsArray = new Y.Array();
+      (changes.data.methods || []).forEach(method => {
+        const methodMap = new Y.Map();
+        Object.entries(method).forEach(([key, value]) => methodMap.set(key, value));
+        // Create parameters array first, populate it, then set on methodMap
+        const paramsArray = new Y.Array();
+        (method.parameters || []).forEach(param => {
+          const paramMap = new Y.Map();
+          Object.entries(param).forEach(([key, value]) => paramMap.set(key, value));
+          paramsArray.push([paramMap]);
+        });
+        methodMap.set('parameters', paramsArray);
+        methodsArray.push([methodMap]);
+      });
+      dataMap.set('methods', methodsArray);
+      dataMap.set('stereotype', changes.data.stereotype || 'class');
+      nodeMap.set('data', dataMap);
+    }
+
+    if (changes.type) {
+      nodeMap.set('type', changes.type);
+    }
+  }, [yNodes]);
+
+  // Eliminar nodo y aristas asociadas
+  const removeNode = useCallback((id: string) => {
+    if (!yNodes || !yEdges) return;
+    yNodes.delete(id);
+    // Eliminar aristas conectadas al nodo
+    yEdges.forEach((edgeMap, edgeId) => {
+      const edge = edgeMap.toJSON() as Edge;
+      if (edge.source === id || edge.target === id) {
+        yEdges.delete(edgeId);
+      }
+    });
+  }, [yNodes, yEdges]);
+
+  // AÃ±adir arista
+  const addEdge = useCallback((edge: Edge<RelationshipData>) => {
+    if (!yEdges) return;
+    const edgeMap = new Y.Map();
+    edgeMap.set('id', edge.id);
+    edgeMap.set('source', edge.source);
+    edgeMap.set('target', edge.target);
+    edgeMap.set('type', edge.type);  // â† Guardar type para ReactFlow
+    if (edge.data) {
+      const dataMap = new Y.Map();
+      Object.entries(edge.data).forEach(([key, value]) => dataMap.set(key, value));
+      edgeMap.set('data', dataMap);
+    }
+    yEdges.set(edge.id, edgeMap);
+  }, [yEdges]);
+
+  // Eliminar arista
+  const removeEdge = useCallback((id: string) => {
+    if (!yEdges) return;
+    yEdges.delete(id);
+  }, [yEdges]);
+
+// Mapeo de tipos de arista de React Flow (minÃºsculas) desde RelationshipData (mayÃºsculas)
+  const typeMap: Record<string, string> = {
+    'INHERITANCE': 'inheritance',
+    'AGGREGATION': 'aggregation',
+    'COMPOSITION': 'composition',
+    'ASSOCIATION': 'default',
+  };
+  
+// Actualizar arista existente
+  const updateEdge = useCallback((id: string, changes: Partial<RelationshipData>) => {
+    if (!yEdges) return;
+    const edgeMap = yEdges.get(id);
+    if (!edgeMap) return;
+
+    // Obtener datos actuales del edge como objeto plano
+    const currentData = edgeMap.toJSON() as {
+      id: string;
+      source: string;
+      target: string;
+      data: {
+        type?: string;
+        cardinalityFrom?: string;
+        cardinalityTo?: string;
+      };
+    };
+    
+    // Determinar el tipo de React Flow (field 'type') aplicando el mapeo necesario
+    // Si changes.type viene definido (en mayÃºsculas de RelationshipData), mapearlo a minÃºsculas
+    // Si no viene, mantener el tipo actual (ya deberÃ­a estar en minÃºsculas desde el origen)
+    const newType: string = changes.type 
+      ? (typeMap[changes.type] || changes.type.toLowerCase()) 
+      : currentData.type;
+    
+    // Si changes.type no viene (undefined), mantener el tipo actual (ya deberÃ­a estar en minÃºsculas)
+    const newCardinalityFrom: string | undefined = changes.cardinalityFrom !== undefined ? changes.cardinalityFrom : currentData.data?.cardinalityFrom;
+    const newCardinalityTo: string | undefined = changes.cardinalityTo !== undefined ? changes.cardinalityTo : currentData.data?.cardinalityTo;
+    
+    // Crear nuevo edgeMap con datos actualizados
+    // Establecer el 'type' de React Flow en minÃºsculas (lo que espera edgeTypes)
+    // y data.type con el valor original para referencia de RelationshipData
+    const edgeMapUpdated = new Y.Map();
+    edgeMapUpdated.set('id', currentData.id);
+    edgeMapUpdated.set('source', currentData.source);
+    edgeMapUpdated.set('target', currentData.target);
+    edgeMapUpdated.set('type', newType); // â† type de React Flow en minÃºsculas
+    
+    // Actualizar data field - data.type guarda el valor original (para referencia de RelationshipData)
+    const dataMap = new Y.Map();
+    dataMap.set('type', changes.type); // Guarda el original (puede ser undefined o mayÃºsculas)
+    dataMap.set('cardinalityFrom', newCardinalityFrom);
+    dataMap.set('cardinalityTo', newCardinalityTo);
+    
+    yEdges.set(id, edgeMapUpdated);
+  }, [yEdges]);
+    }
+    // Si changes.type es undefined, mantenemos el tipo actual (newType ya tiene valor)
+    
+    // Obtener valores de cardinalidad (usar cambios si vienen, sino los actuales)
+    const newCardinalityFrom: string | undefined = changes.cardinalityFrom !== undefined ? changes.cardinalityFrom : currentData.data?.cardinalityFrom;
+    const newCardinalityTo: string | undefined = changes.cardinalityTo !== undefined ? changes.cardinalityTo : currentData.data?.cardinalityTo;
+    
+    // Crear nuevo edgeMap con datos actualizados
+    // Establecer ambos: el 'type' superior de React Flow y el 'data.type'
+    const edgeMapUpdated = new Y.Map();
+    edgeMapUpdated.set('id', currentData.id);
+    edgeMapUpdated.set('source', currentData.source);
+    edgeMapUpdated.set('target', currentData.target);
+    edgeMapUpdated.set('type', newType); // â† CRÃTICO: Actualizar field type de React Flow
+    
+    // Actualizar data field - mantener consistencia con la estructura esperada
+    const dataMap = new Y.Map();
+    dataMap.set('type', changes.type || currentData.data?.type); // data.type para referencia
+    dataMap.set('cardinalityFrom', newCardinalityFrom);
+    dataMap.set('cardinalityTo', newCardinalityTo);
+    
+    yEdges.set(id, edgeMapUpdated);
+  }, [yEdges]);
+
+  // Manejar cambios locales de nodos (arrastrar, eliminar, etc.)
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    // Aplicar cambios al estado local para UI fluida
+    setNodes(prevNodes => applyNodeChanges(changes, prevNodes));
+    // Propagar cambios relevantes a Yjs
+    changes.forEach(change => {
+      if (change.type === 'position' && change.position) {
+        updateNode(change.id, { position: change.position });
+      } else if (change.type === 'remove') {
+        removeNode(change.id);
+      }
+      // Otros tipos (dimensions, select) no se sincronizan
+    });
+  }, [updateNode, removeNode]);
+
+  // Manejar cambios locales de aristas (eliminar, etc.)
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    setEdges(prevEdges => applyEdgeChanges(changes, prevEdges));
+    changes.forEach(change => {
+      if (change.type === 'remove') {
+        removeEdge(change.id);
+      }
+    });
+  }, [removeEdge]);
+
+  // Crear nueva arista al conectar nodos
+  const onConnect = useCallback((connection: any) => {
+    const newEdge: Edge<RelationshipData> = {
+      id: `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      source: connection.source,
+      target: connection.target,
+      type: 'association',  // Default type
+      data: { type: 'ASSOCIATION' },
+    };
+    addEdge(newEdge);
+  }, [addEdge]);
+
+  // Exportar diagrama a JSON
+  const exportDiagram = useCallback(() => {
+    const data = { nodes, edges };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'diagrama.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [nodes, edges]);
+
+  // Importar diagrama desde JSON
+  const importDiagram = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target!.result as string);
+        if (!data.nodes || !data.edges) {
+          alert('Formato JSON invÃ¡lido');
+          return;
+        }
+        if (yNodes) yNodes.clear();
+        if (yEdges) yEdges.clear();
+        data.nodes.forEach((node: Node<EntityNodeData>) => addNode(node));
+        data.edges.forEach((edge: Edge<RelationshipData>) => addEdge(edge));
+      } catch (error) {
+        alert('Error al importar: ' + (error as Error).message);
+      }
+    };
+    reader.readAsText(file);
+  }, [yNodes, yEdges, addNode, addEdge]);
+
+  return {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    addNode,
+    updateNode,
+    removeNode,
+    addEdge,
+    removeEdge,
+    exportDiagram,
+    importDiagram,
+    isConnected,
+    updateEdge,
+  };
+}
