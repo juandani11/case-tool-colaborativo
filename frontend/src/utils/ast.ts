@@ -56,12 +56,14 @@ export function isManySide(card?: string): boolean {
   );
 }
 
-// Convierte nodos y aristas de React Flow al AST que espera el backend.
-// Las relaciones * a * generan entidad intermedia explícita
-// (clase asociativa UML 2.5) en lugar de @ManyToMany.
-//
-// Las aristas punteadas (isAssociationClassLink) son internas del editor
-// y se excluyen: la relación se sintetiza desde el nodo asociativo.
+// Convierte el canvas (nodos y aristas de React Flow) al AST que espera
+// el backend: { entities, relationships }.
+// - El canvas habla con IDs ("edge.source = node_123"); el AST habla con
+//   NOMBRES ("fromEntity = Cliente"). El mapa idToName hace esa traduccion.
+// - Las relaciones * a * NO viajan como @ManyToMany: generan una entidad
+//   intermedia explicita (clase asociativa UML 2.5).
+// - Las aristas punteadas (isAssociationClassLink) son decoracion del editor
+//   y se excluyen: la relacion se sintetiza desde el nodo asociativo.
 export function nodesToAST(
   nodes: Node<EntityNodeData>[],
   edges: Edge<RelationshipData>[]
@@ -185,7 +187,10 @@ export function nodesToAST(
   return { entities, relationships: [...relationships, ...synthesized] };
 }
 
-// Aplica las mutaciones devueltas por la IA al estado colaborativo
+// Aplica las mutaciones de la IA al diagrama colaborativo.
+// El ORDEN es obligatorio: primero se crean las entidades (paso 1) para que
+// los pasos siguientes puedan resolver nombres -> IDs. Borrar entidades va
+// ultimo para no dejar aristas colgadas. Alterar este orden rompe referencias.
 export function applyMutations(mutations: any[], hooks: any) {
   // Mapa local para resolver nombres → IDs de nodos recién creados
   const entityNameToId: Record<string, string> = {};

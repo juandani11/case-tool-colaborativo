@@ -5,8 +5,8 @@
       "id": "entity_1790042755250_s4rji29t1",
       "type": "entity",
       "position": {
-        "x": 761.2128826629928,
-        "y": -85.89013838087536
+        "x": 781.0118725362163,
+        "y": -320.6495897348091
       },
       "data": {
         "label": "NuevaEntidad",
@@ -112,6 +112,22 @@
       },
       "width": 220,
       "height": 110
+    },
+    {
+      "id": "entity_1790613919133_vqpaq4tj1",
+      "type": "entity",
+      "position": {
+        "x": 535.6004558145007,
+        "y": 445.9361878073708
+      },
+      "data": {
+        "label": "estudiante",
+        "stereotype": "class",
+        "attributes": [],
+        "methods": []
+      },
+      "width": 220,
+      "height": 72
     }
   ],
   "edges": [

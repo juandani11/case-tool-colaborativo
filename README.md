@@ -16,8 +16,17 @@ Herramienta de diseño de software colaborativa en tiempo real, centrada en el m
 - ✅ Paleta lateral con drag-and-drop + modo conexion para relaciones.
 - ✅ Soft-lock visual de nodos (awareness).
 - ✅ Autenticación JWT + ACLs por diagrama + dashboard.
-- ❌ Exportación a PlantUML/SQL (Semana 3).
-- ❌ Persistencia en base de datos (actualmente Yjs en memoria).
+- ✅ Self-loops (relación reflexiva con bucle `SelfLoopEdge`).
+- ✅ Labels de cardinalidad desplazados del borde (`ALONG_OFFSET=28`).
+- ✅ Manual de usuario embebido (botón ❓ Ayuda, F1, buscador, 10 secciones).
+- ✅ Herencia JPA `JOINED` (solo la raíz lleva `@Inheritance`, hijos con `@PrimaryKeyJoinColumn`).
+- ✅ Persistencia en servidor (`backend/data/diagrams/*.json` + `*.acl.json` vía REST snapshot).
+- ✅ Despliegue frontend en Vercel (`vercel.json` + tipos `y-websocket.d.ts`).
+- ❌ Exportación a PlantUML/SQL.
+- ❌ Persistencia en base de datos (actualmente archivos JSON en servidor).
+
+> Arquitectura y flujos detallados (archivos, librerías y decisiones):
+> [`docs/FLUJOS_Y_ARQUITECTURA.md`](docs/FLUJOS_Y_ARQUITECTURA.md).
 
 ## Requisitos
 
@@ -26,79 +35,116 @@ Herramienta de diseño de software colaborativa en tiempo real, centrada en el m
 - API key de Groq (gratuita) o instalar Ollama local (alternativa)
 
 ## Estructura del proyecto
-case-tool/
-├── backend/ # Servidor WebSocket + API REST para IA
-│ ├── server.js
-│ ├── .env
-│ └── package.json
-├── frontend/ # Aplicación Next.js con React Flow
-│ └── src/
-│ ├── app/
-│ │ └── page.tsx
-│ ├── components/
-│ │ ├── EntityNode.tsx
-│ │ ├── Toolbar.tsx
-│ │ └── EntityEditorPanel.tsx
-│ ├── hooks/
-│ │ ├── useCollaborativeFlow.ts
-│ │ └── useAICommand.ts
-│ ├── types/
-│ │ └── diagram.ts
-│ └── utils/
-│ └── ast.ts
-└── README.md
 
-text
+```text
+case-tool/
+├── backend/                  # Express + y-websocket + generador Handlebars
+│   ├── server.js             # Composition root: REST + WS, gate 4401/4403
+│   ├── routes/               # auth.js, diagrams.js, acl.js
+│   ├── middleware/           # auth.js (JWT), diagramAuth.js (ACL por diagrama)
+│   ├── services/             # userService.js, aclService.js
+│   ├── generator/            # generate.js, typeMapper.js, templates/*.hbs
+│   ├── data/diagrams/        # <id>.json + <id>.acl.json (persistencia)
+│   └── tests/                # auth, acl, dashboard
+├── frontend/                 # Next.js 16 + React Flow 11 + Yjs 13
+│   └── src/
+│       ├── app/              # layout, page (redirect), dashboard, diagram/[id], login, register
+│       ├── components/       # EntityNode, UmlEdge + 4 edges, SelfLoopEdge, Toolbar,
+│       │                     # Palette, Sidebar, ChatPanel, MembersPanel, HelpModal, ...
+│       ├── hooks/            # useCollaborativeFlow, useAICommand, useNodeLocks,
+│       │                     # useDiagramRole, useAuth, useHelpModal
+│       ├── utils/            # ast, yjsNodeHelpers, yjsEdgeHelpers, floatingEdges,
+│       │                     # associationClass, xmiExporter, xmiImporter, ...
+│       ├── lib/              # apiClient (JWT), presence (identidad)
+│       ├── contexts/         # AuthContext
+│       ├── data/             # manual.ts (10 secciones de ayuda)
+│       └── types/            # diagram.ts, y-websocket.d.ts
+├── docs/
+│   └── FLUJOS_Y_ARQUITECTURA.md  # Documento de ingeniería: flujos, archivos, librerías
+├── vercel.json               # Deploy del frontend (monorepo)
+└── README.md
+```
 
 ## Instalación
 
 1. Clonar repositorio.
 2. Backend:
+
    ```bash
    cd backend
    npm install
-Frontend:
+   ```
 
-bash
-cd frontend
-npm install
-Configuración
+3. Frontend:
+
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+## Configuración
+
 Obtener API key de Groq (gratuita) registrándote en console.groq.com.
 
-Crear archivo backend/.env con:
+Crear archivo `backend/.env` (ver `backend/.env.example` como plantilla):
 
-text
+```text
 GROQ_API_KEY=tu_api_key_aqui
 GROQ_MODEL=openai/gpt-oss-20b
-Puedes cambiar GROQ_MODEL por otro modelo disponible en tu cuenta (consulta la lista con curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer TU_API_KEY").
+GROQ_VISION_MODEL=qwen/qwen3.8-27b
+AUTH_ENABLED=false
+JWT_SECRET=<mínimo 32 caracteres, ej. openssl rand -hex 32>
+JWT_EXPIRATION=7d
+PORT=1234
+```
 
-(Opcional) Si prefieres usar Ollama local, modifica server.js para usar la API de Ollama (código comentado).
+Puedes cambiar `GROQ_MODEL` por otro modelo disponible en tu cuenta
+(consulta la lista con `curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer TU_API_KEY"`).
 
-Ejecución
+Reiniciar el backend tras cambiar el `.env` (`server.js` lo lee una sola vez al arrancar).
+
+(Opcional) `frontend/.env.local` para apuntar al backend:
+
+```text
+NEXT_PUBLIC_API_URL=http://localhost:1234
+NEXT_PUBLIC_WS_URL=ws://localhost:1234
+```
+
+## Ejecución
+
 Iniciar backend (WebSocket + API):
 
-bash
+```bash
 cd backend
 npm start
+```
+
 El servidor escucha en http://localhost:1234 (WebSocket y API REST).
 
 Iniciar frontend:
 
-bash
+```bash
 cd frontend
 npm run dev
+```
+
 Abrir http://localhost:3000 en el navegador.
 
 Para probar colaboración, abrir dos pestañas o navegadores diferentes.
 
-Funcionalidades actuales
-Agregar Entidad: botón + Entidad en la barra superior.
+## Funcionalidades actuales
 
-Conectar entidades: arrastrar desde el handle inferior de una entidad al superior de otra.
+Agregar Entidad: botón + Entidad en la barra superior, o drag-and-drop
+desde la paleta lateral (Clase, Interfaz, Abstracta, Nota).
 
-Exportar JSON: descarga el diagrama actual.
+Conectar entidades: arrastrar entre nodos, o modo conexión de la
+paleta (click en el tipo → click origen → click destino). Click dos
+veces en el mismo nodo crea un self-loop.
 
-Importar JSON: carga un diagrama previamente exportado.
+Exportar JSON/XMI: descarga el diagrama actual (XMI compatible con
+Enterprise Architect).
+
+Importar JSON/XMI: carga un diagrama previamente exportado.
 
 Indicador de conexión: muestra si el cliente está conectado al servidor de colaboración.
 
@@ -106,7 +152,11 @@ Comandos de IA: escribe un comando en lenguaje natural (ej. "Crea entidad Produc
 
 Reconocimiento de voz: haz clic en el botón 🎤 y dicta el comando (requiere Chrome/Edge y conexión segura en localhost).
 
+Generación desde imagen: sube una foto del diagrama y la IA la convierte en nodos/aristas editables.
+
 Edición de atributos: selecciona una entidad para abrir el panel lateral. Renombra la entidad, añade/elimina atributos, cambia tipos y marca PK, nullable, unique. Guarda los cambios con el botón "Guardar cambios".
+
+Manual embebido: botón ❓ Ayuda (o F1) abre el manual de usuario sin salir de la app.
 
 ## Relaciones * a * → entidad intermedia explícita
 
@@ -533,18 +583,73 @@ Los locks expiran a los 30 segundos. El usuario que tiene el lock puede mover su
 
 `useNodeLocks.ts` lee los locks activos del awareness.
 
-Próximos pasos (Semana 3)
-□ Generación de código Spring Boot + PostgreSQL a partir del diagrama.
-□ Exportación a PlantUML y SQL.
-□ Persistencia del diagrama en base de datos (actualmente solo Yjs en memoria).
-□ Mejoras en el panel de edición (drag & drop de atributos, importación desde JSON de entidades).
-□ Aplicación móvil con asistente por voz.
-Solución de problemas
+## Self-loops (relaciones reflexivas)
+
+Click en el tipo de relación → click en el nodo → click otra vez en el
+**mismo nodo** → se crea un bucle (`edge.type = 'selfloop'`,
+`components/edges/SelfLoopEdge.tsx`). El tipo UML real viaja en
+`data.type`, así el AST y el backend no cambian. También funciona por
+drag entre handles del mismo nodo. Escape sigue cancelando el modo
+conexión.
+
+## Labels de cardinalidad
+
+`UmlEdge.tsx` posiciona las etiquetas con `ALONG_OFFSET = 28` (a lo
+largo de la arista) + `PERP_OFFSET = 24` (perpendicular), para que no
+queden tapadas por el borde de la entidad. Vale para los 4 tipos de
+arista (comparten la base `UmlEdge`).
+
+## Manual de usuario embebido
+
+Botón ❓ **Ayuda** en la toolbar del editor y en el header del
+dashboard (`HelpModal.tsx` + `data/manual.ts` + `useHelpModal.ts`).
+10 secciones con índice lateral, buscador, atajo **F1** para abrir y
+**Escape**/click-fuera para cerrar. Render con `react-markdown`.
+
+## Herencia JPA (`JOINED`)
+
+`generator/generate.js::buildInheritanceInfo` distingue raíz e hijo:
+
+- **Raíz** (tiene hijos): `@Inheritance(strategy = InheritanceType.JOINED)`
+  + `@DiscriminatorColumn(name = "dtype")`.
+- **Hijo** (tiene padre): `extends Padre` + `@PrimaryKeyJoinColumn(name = "id")`,
+  **sin** `@Inheritance` (JPA exige una sola estrategia por jerarquía;
+  ponerla en el hijo rompe el arranque en PostgreSQL).
+
+## Persistencia en servidor
+
+Snapshot `{ name, nodes, edges, chat }` vía REST
+(`GET/POST /api/diagrams/:id`, `PUT .../rename`, `DELETE` solo OWNER)
+en `backend/data/diagrams/<id>.json` + `<id>.acl.json`. Al abrir, el
+frontend rehidrata el `Y.Doc` en una sola transacción
+(`loadDiagramData`). Ver `docs/FLUJOS_Y_ARQUITECTURA.md` (F7).
+
+## Despliegue en Vercel (frontend)
+
+`vercel.json` en la raíz (monorepo) + `Root Directory = frontend` en el
+dashboard de Vercel. `src/types/y-websocket.d.ts` declara
+`WebsocketProvider` para evitar el error TS7016 sin necesidad de
+`ignoreBuildErrors`.
+
+## Próximos pasos
+
+- □ Exportación a PlantUML y SQL.
+- □ Persistencia del diagrama en base de datos (actualmente archivos JSON en servidor).
+- □ Mejoras en el panel de edición (drag & drop de atributos, importación desde JSON de entidades).
+- □ Aplicación móvil con asistente por voz.
+
+## Solución de problemas
+
 La IA no responde: verifica que el backend esté corriendo y que GROQ_API_KEY sea válida. Revisa el modelo en GROQ_MODEL.
 
 El reconocimiento de voz no funciona: asegúrate de usar Chrome o Edge y estar en localhost o HTTPS.
 
 El WebSocket se desconecta: comprueba que NEXT_PUBLIC_WS_URL en frontend/.env.local sea ws://localhost:1234.
 
-Licencia
+La intermedia `* a *` no se genera: 1) verifica cardinalidades `*` en el panel de la arista, 2) revisa el payload de `POST /api/generate` en Network, 3) reinicia el backend tras tocar el generador.
+
+Error Hibernate `may not override SINGLE_TABLE`: regenera con la versión actual (el hijo ya no lleva `@Inheritance`).
+
+## Licencia
+
 Este proyecto es de código abierto para fines educativos.

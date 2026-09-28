@@ -1,6 +1,10 @@
 import { memo } from 'react';
 import { getSmoothStepPath, EdgeProps, Position } from 'reactflow';
 
+// Base visual de las 4 aristas UML: path ortogonal (getSmoothStepPath, estilo
+// Enterprise Architect) + etiquetas de cardinalidad con fondo blanco +
+// resaltado azul al seleccionar. Los wrappers (Association, Inheritance...)
+// solo aportan su marcador. Cambiar ALONG_OFFSET mueve TODOS los labels.
 export interface UmlEdgeData {
   type?: string;
   cardinalityFrom?: string;

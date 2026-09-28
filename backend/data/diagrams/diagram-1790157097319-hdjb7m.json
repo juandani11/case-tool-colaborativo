@@ -2,11 +2,11 @@
   "name": "Nuevo diagrama",
   "nodes": [
     {
-      "id": "entity_1790088275021_xviu",
+      "id": "entity_1790157103717_cmpk",
       "type": "entity",
       "position": {
-        "x": -130.99885057471266,
-        "y": 177.01149425287355
+        "x": 49.5,
+        "y": 177.5
       },
       "data": {
         "label": "NuevaClase",
@@ -18,14 +18,14 @@
       "height": 72
     },
     {
-      "id": "entity_1790088276638_nbl6",
+      "id": "entity_1790157157357_5dyc",
       "type": "entity",
       "position": {
-        "x": 21.86551724137928,
-        "y": -261.89252873563225
+        "x": 251.5,
+        "y": -3.75
       },
       "data": {
-        "label": "NuevaClase",
+        "label": "NuevaClase2",
         "stereotype": "class",
         "attributes": [],
         "methods": []
@@ -36,9 +36,9 @@
   ],
   "edges": [
     {
-      "id": "edge_1790607984845_uwnz6mypg",
-      "source": "entity_1790088276638_nbl6",
-      "target": "entity_1790088275021_xviu",
+      "id": "edge_1790157174607_apb5e4k49",
+      "source": "entity_1790157157357_5dyc",
+      "target": "entity_1790157103717_cmpk",
       "type": "association",
       "data": {
         "type": "ASSOCIATION",

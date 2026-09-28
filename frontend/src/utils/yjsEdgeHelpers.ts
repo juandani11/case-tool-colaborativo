@@ -2,6 +2,11 @@
 
 import * as Y from 'yjs';
 
+// Puente aristas React Flow <-> Yjs. Doble tipado: `edge.type` (como se
+// DIBUJA: association, inheritance...) vs `data.type` (semantica UML:
+// ASSOCIATION, INHERITANCE...). No mezclarlos: el render usa uno, el AST
+// y el backend usan el otro. updateEdge fusiona (merge) para no perder
+// campos extra como associationClassNodeId o intermediateAttributes.
 export const typeMap: Record<string, string> = {
   'INHERITANCE': 'inheritance',
   'AGGREGATION': 'aggregation',

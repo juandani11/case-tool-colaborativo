@@ -7,6 +7,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import AppLogo from '../../components/AppLogo';
 import { DS } from '../../styles/design-system';
 
+// Registro: valida que passwords coincidan EN CLIENTE antes de llamar, luego
+// AuthContext.register() (POST /api/auth/register, el primero entra sin
+// invitacion) -> /dashboard. El resto de validaciones las hace el backend.
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');

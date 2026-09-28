@@ -1,6 +1,9 @@
 import { Node, Edge } from 'reactflow';
 import { EntityNodeData, RelationshipData, Attribute, Method } from '../types/diagram';
 
+// Exporta el diagrama a XMI (UML 2.5) para abrirlo en Enterprise Architect.
+// Solo viajan clases, atributos y relaciones: el vinculo de clase asociativa
+// se pierde (limitacion conocida) y reimporta como entidad standalone.
 const XMI_NS = 'http://www.omg.org/spec/XMI/20131001';
 const UML_NS = 'http://www.omg.org/spec/UML/20131001';
 

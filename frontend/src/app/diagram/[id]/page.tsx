@@ -48,6 +48,8 @@ import {
   planAssociationDelete,
 } from '../../../utils/associationClass';
 
+// Registro de renderers: UN nodeType (la variante va en data) y SEIS edgeTypes.
+// `type` es SOLO visual; la semantica UML viaja en data.type (no mezclar).
 const nodeTypes = { entity: EntityNode };
 const edgeTypes = {
   association: AssociationEdge,
@@ -68,6 +70,11 @@ function humanizeDiagramId(id: string): string {
   return `Diagrama ${num}`;
 }
 
+// Orquestador del editor: lista de diagramas, rol (VIEWER = read-only),
+// modo conexion de paleta (source -> target, Escape cancela, mismo nodo =
+// self-loop), panels (entidad/arista/chat/miembros/ayuda), XMI, generate.
+// Se monta con key={diagramId}: al navegar se remonta TODO (Yjs, rol, panels)
+// y no se mezclan rooms. La colaboracion real vive en useCollaborativeFlow.
 function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState<DiagramInfo[]>([]);

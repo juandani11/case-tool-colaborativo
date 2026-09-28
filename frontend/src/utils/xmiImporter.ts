@@ -1,6 +1,10 @@
 import { Node, Edge } from 'reactflow';
 import { EntityNodeData, RelationshipData } from '../types/diagram';
 
+// Reconstruye nodos y aristas desde un XMI (Enterprise Architect u otro).
+// Los IDs se regeneran (genId): el XMI trae los suyos pero el editor usa
+// los propios para no colisionar con nodos ya existentes en el canvas.
+// Tipos desconocidos caen a String/ASSOCIATION para no romper la importacion.
 interface ImportHooks {
   addNode: (node: Node<EntityNodeData>) => void;
   addEdge: (edge: Edge<RelationshipData>) => void;

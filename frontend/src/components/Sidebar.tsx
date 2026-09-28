@@ -4,6 +4,9 @@ import React from 'react';
 import { Node, Edge } from 'reactflow';
 import { EntityNodeData, RelationshipData } from '../types/diagram';
 
+// Explorador de entidades y relaciones (izquierda). Click = seleccionar en el
+// canvas (misma seleccion que React Flow). Excluye aristas punteadas internas
+// (isAssociationClassLink). flex-shrink-0: nunca comprime el canvas.
 interface SidebarProps {
   nodes: Node<EntityNodeData>[];
   edges: Edge<RelationshipData>[];

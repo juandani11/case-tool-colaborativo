@@ -2,6 +2,8 @@
 
 import { useAuth } from '../contexts/AuthContext';
 
+// Avatar + logout en la toolbar. Solo renderiza con AUTH_ENABLED=true y
+// sesion (si no, null): en modo abierto no hay usuario que mostrar.
 export default function UserMenu() {
   const { user, logout, authEnabled, loading } = useAuth();
   if (loading || !authEnabled || !user) return null;

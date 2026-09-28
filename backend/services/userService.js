@@ -27,6 +27,9 @@ async function writeUsers(users) {
   await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
 }
 
+// Quita el hash antes de responder: el passwordHash JAMAS sale del backend
+// (ni en login, ni en /me, ni en miembros). Si agregas un endpoint que
+// devuelva usuarios, pasalo por safe() siempre.
 function safe(user) {
   if (!user) return null;
   const { passwordHash: _, ...userSafe } = user;

@@ -3,6 +3,12 @@
 import { useEffect, useState, memo } from 'react';
 import { EntityNodeData, Attribute, Method, MethodParameter } from '../types/diagram';
 
+// Panel lateral de edicion de la entidad seleccionada (nombre, atributos con
+// PK/nullable/unique, metodos). Edita una COPIA local y guarda con onSave ->
+// page.tsx escribe a Yjs (updateNode): el panel nunca toca Yjs directo.
+// Tambien gestiona disolver la clase asociativa (associationInfo).
+
+
 export interface AssociationInfo {
   fromName: string;
   toName: string;

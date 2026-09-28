@@ -2,6 +2,9 @@
 
 import { RelationshipData } from '../types/diagram';
 
+// Mapeos legacy para diagramas viejos (el canonico actual vive en
+// yjsEdgeHelpers.ts). Se mantiene para no romper imports guardados con
+// el tipo 'default'. Codigo nuevo: usar yjsEdgeHelpers, no este archivo.
 export const typeMap: Record<string, string> = {
   'INHERITANCE': 'inheritance',
   'AGGREGATION': 'aggregation',

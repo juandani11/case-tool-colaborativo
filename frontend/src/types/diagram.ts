@@ -1,3 +1,6 @@
+// Contrato compartido de todo el frontend: canvas, panels, AST e IA hablan
+// estos tipos. Si agregas un campo a un nodo/arista, agregalo aqui primero
+// y TypeScript te mostrara cada lugar que hay que actualizar.
 export interface Attribute {
   id: string;
   name: string;

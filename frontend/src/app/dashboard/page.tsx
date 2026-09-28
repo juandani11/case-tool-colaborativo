@@ -7,6 +7,8 @@ import { apiFetch, API_BASE } from '../../lib/apiClient';
 import { DiagramCard } from '../../components/DiagramCard';
 import { DS } from '../../styles/design-system';
 import AppLogo from '../../components/AppLogo';
+import { HelpModal } from '../../components/HelpModal';
+import { useHelpModal } from '../../hooks/useHelpModal';
 
 interface DiagramSummary {
   id: string;
@@ -18,6 +20,9 @@ interface DiagramSummary {
   ownerUsername?: string;
 }
 
+// Dashboard: lista owned/shared (GET /api/diagrams), buscador local, crear
+// (POST -> push /diagram/id). Sin sesion y con auth activo redirige a /login.
+// Las cards (DiagramCard) muestran rol y dueno; "Solicitudes" es placeholder.
 export default function DashboardPage() {
   const { user, loading: authLoading, authEnabled, logout } = useAuth();
   const router = useRouter();
@@ -26,6 +31,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const help = useHelpModal();
 
   // Redirigir a login si no hay sesión y auth está activo
   useEffect(() => {
@@ -101,6 +107,13 @@ export default function DashboardPage() {
             <span className="text-sm text-gray-500">Dashboard</span>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={help.open}
+              className={`${DS.button.base} text-sm ${DS.button.ghost} !py-1 !px-3`}
+              title="Abrir manual de usuario (F1)"
+            >
+              ❓ Ayuda
+            </button>
             {user ? (
               <>
                 <span className="text-sm text-gray-700">{user.username}</span>
@@ -180,6 +193,7 @@ export default function DashboardPage() {
           </div>
         </section>
       </main>
+      <HelpModal isOpen={help.isOpen} onClose={help.close} />
     </div>
   );
 }

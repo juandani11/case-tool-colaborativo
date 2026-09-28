@@ -130,6 +130,9 @@ const templates = {
 const BASE_PACKAGE = 'com.example.demo';
 const BASE_PATH = `src/main/java/${BASE_PACKAGE.replace(/\./g, '/')}`;
 
+// Decide el tipo JPA mirando AMBAS cardinalidades ("1" y "*" -> oneToMany
+// del lado 1, manyToOne del lado N). El llamador elige la perspectiva
+// (origen o destino) antes de llamar; esta funcion solo clasifica el par.
 function resolveCardinality(cardFrom, cardTo) {
   const isFromMany = isManySide(cardFrom);
   const isToMany = isManySide(cardTo);
@@ -145,14 +148,19 @@ function resolveCardinality(cardFrom, cardTo) {
   return 'oneToMany';
 }
 
+// Un extremo es "muchos" si su cardinalidad lo dice ("*", "0..*", "1..*",
+// "N", "M"). Se usa en dos lugares: para clasificar JPA y para detectar
+// * a * (ambos extremos "muchos" -> entidad intermedia, nunca @ManyToMany).
 function isManySide(card) {
   if (!card) return false;
   const c = String(card).trim();
   return c === '*' || c === 'N' || c === 'M' || c === 'n' || c === 'm' || c.includes('*');
 }
 
-// Resuelve el nombre de entidad de un extremo de relación.
-// Acepta string (id o nombre) u objeto { entityName } / { name }.
+// Resuelve el NOMBRE de entidad de un extremo de relacion.
+// Acepta string (id, nombre visible o ya sanitizado) u objeto
+// { entityName } / { name }: los diagramas viejos y nuevos guardan
+// formatos distintos y esto los unifica. Devuelve null si no hay nada.
 function relEndName(end, allEntities) {
   if (!end) return null;
   if (typeof end === 'string') {
@@ -175,7 +183,9 @@ function relToName(rel, allEntities) {
   return rel.toEntity || relEndName(rel.target, allEntities);
 }
 
-// ¿La relación es * a *? (tipo explícito o cardinalidades en ambos lados)
+// ¿Esta relacion es * a *? Vale el tipo explicito MANY_TO_MANY o que
+// AMBOS extremos sean "muchos". Si es true, expandManyToMany() la reemplaza
+// por una intermedia + dos * a 1 (jamas se emite @ManyToMany).
 function isManyToManyRel(rel) {
   if (!rel) return false;
   if (rel.type === 'MANY_TO_MANY') return true;
@@ -187,10 +197,13 @@ function toLowerFirst(str) {
   return str.charAt(0).toLowerCase() + str.slice(1);
 }
 
-// Expande cada relación * a * en una entidad intermedia explícita
-// (clase asociativa UML 2.5) + dos relaciones * a 1 sintéticas.
+// Expande cada * a * en: entidad intermedia (PK UUID propia + atributos de
+// la relacion) + dos relaciones sinteticas intermedia(*) -> original(1).
 // Devuelve { allEntities, allRelationships, intermediates }.
-// NO se genera @ManyToMany en ningún caso.
+// Por que no @ManyToMany: dos colecciones bidireccionales serializan en loop
+// JSON y @JoinTable no admite columnas extra (cantidad, fecha, ...).
+// Respeta el nombre de la clase asociativa del editor si es valido; si
+// colisiona con una entidad existente agrega sufijo numerico.
 function expandManyToMany(entities, relationships, takenNames) {
   const allEntities = [...(entities || [])];
   const allRelationships = [];
@@ -387,9 +400,11 @@ function isValidJavaIdentifier(name) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name || '');
 }
 
-// Sanitiza entidades preservando el nombre visible en `originalName`.
-// Si dos entidades colisionan tras sanitizar ("Order-Details" y
-// "Order Details" -> "OrderDetails"), la segunda recibe sufijo numérico.
+// Convierte nombres visibles ("Order Details") en identificadores Java
+// validos ("OrderDetails"); el visible se conserva en `originalName`.
+// Si dos entidades colisionan tras sanitizar, la segunda lleva sufijo
+// numerico. Tambien calcula tableName (snake), fieldName (camel) y route.
+// Debe correr ANTES de resolver relaciones: todo lo demas usa estos nombres.
 function sanitizeEntities(rawEntities) {
   const taken = new Set();
   return (rawEntities || []).map((raw, idx) => {
@@ -414,9 +429,10 @@ function sanitizeEntities(rawEntities) {
   });
 }
 
-// Reescribe los extremos de las relaciones a los nombres sanitizados.
-// Acepta endpoints como { entityName }, { name } o string (id, nombre
-// original o nombre ya sanitizado).
+// Reescribe los extremos de cada relacion a los nombres YA sanitizados
+// (via lookup byId/byOriginal/bySanitized). Corre despues de
+// sanitizeEntities() y antes de expandManyToMany(): sin esto, una relacion
+// que apunta al id o al nombre visible no matchea ninguna entidad.
 function normalizeRelationshipEndpoints(rel, lookup) {
   const resolve = (end, flat) => {
     if (flat && lookup.bySanitized[flat]) return flat;
@@ -453,6 +469,12 @@ function buildEntityLookup(sanitizedEntities) {
   return { byId, byOriginal, bySanitized };
 }
 
+// Calcula TODAS las relaciones de UNA entidad desde su propia perspectiva.
+// Cada entrada describe: jpaType (manyToOne/oneToMany/...), la otra entidad,
+// la columna FK (cliente_id), quien es dueño (owner = lleva @JoinColumn) y
+// el mappedBy del lado inverso. Las plantillas solo interpolan estos datos:
+// no deciden nada de JPA aqui. La rama manyToMany es legacy (las * a *
+// ya se expandieron antes de llegar).
 function buildEntityRelations(entity, allEntities, allRelationships) {
   const entityName = entity.name;
   const results = [];
@@ -571,6 +593,13 @@ function buildEntityRelations(entity, allEntities, allRelationships) {
   return results;
 }
 
+// Clasifica la entidad en la jerarquia de herencia (o null si no hereda).
+// - Hijo (es target de INHERITANCE): { parentEntity } -> la plantilla emite
+//   `extends Padre` + @PrimaryKeyJoinColumn, SIN @Inheritance.
+// - Raiz (es source, tiene hijos): { isRoot: true } -> la plantilla emite
+//   @Inheritance(JOINED) + @DiscriminatorColumn.
+// JPA exige UNA sola estrategia por jerarquia: @Inheritance en el hijo
+// rompe el arranque en PostgreSQL ("may not override SINGLE_TABLE").
 function buildInheritanceInfo(entity, allEntities, allRelationships) {
   // ¿Es hijo? (tiene relación INHERITANCE donde él es el target)
   const parentRel = allRelationships.find(
@@ -601,9 +630,10 @@ function buildInheritanceInfo(entity, allEntities, allRelationships) {
   return null;
 }
 
-// Lista de campos para los getters/setters explícitos del modelo:
-// PK + atributos (no PK, sin colisiones FK) + campos de relaciones
-// (@ManyToOne, @OneToOne, @OneToMany). Cada entrada: { javaType, name }.
+// Campos que llevan getter/setter EXPLICITOS en la entidad (ademas de Lombok):
+// PK + atributos (sin PK repetida ni colisiones FK) + campos de relaciones.
+// Cada entrada es { javaType, name }. Si falta un campo aqui, el test
+// getters-setters.test.js lo detecta (cuenta getters >= campos).
 function buildModelAccessors(primaryKey, mappedAttributes, relations) {
   const accessors = [{ javaType: primaryKey.javaType, name: primaryKey.nameCamel }];
   for (const attr of mappedAttributes || []) {
@@ -658,9 +688,10 @@ function safeTableNameJs(name) {
   return reservedWords.includes(String(name).toLowerCase()) ? `"${name}"` : name;
 }
 
-// Líneas de columna para el CREATE TABLE de la migración.
-// Omite atributos en colisión FK (los mapea la relación) para no duplicar
-// columnas. Cada entrada es una línea SQL completa; la plantilla une con comas.
+// Lineas del CREATE TABLE para la migracion Flyway.
+// Omite atributos en colision FK (la columna la aporta la relacion) para no
+// duplicar columnas. Cada entrada es una linea SQL completa; la plantilla
+// migration.sql.hbs las une con comas. Las reserved words van entrecomilladas.
 function buildSqlColumns(mappedAttributes, relations, tableName) {
   const lines = [];
   const sqlPkType = (sqlType, isUuid) => {
@@ -688,6 +719,16 @@ function buildSqlColumns(mappedAttributes, relations, tableName) {
   return lines;
 }
 
+// Orquestador: AST -> proyecto Spring Boot en ZIP. Etapas en orden:
+// 0) sanitizeEntities + normalizeRelationshipEndpoints (nombres Java validos)
+// 1) expandManyToMany (* a * -> intermedia + dos * a 1, jamas @ManyToMany)
+// 2) por entidad: PK, buildEntityRelations, buildInheritanceInfo, colisiones FK,
+//    accessors, sqlColumns -> render Handlebars (modelo, repo, service,
+//    controller, dto) -> escritura a disco temporal
+// 3) infra una vez: pom, properties, main, seguridad JWT, AI, handler, README,
+//    migracion Flyway, config.json (Flutter)
+// 4) archiver ZIP -> resuelve con zipPath (server.js lo descarga y lo borra).
+// Devuelve Promise<string> con la ruta del ZIP.
 function generateProject(ast) {
   return new Promise((resolve, reject) => {
     try {

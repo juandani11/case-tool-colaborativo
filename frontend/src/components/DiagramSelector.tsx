@@ -2,6 +2,9 @@
 
 import React, { useState } from 'react';
 
+// Selector interno del editor (lista, crear, renombrar, borrar). Navega con
+// router.push(/diagram/id): page.tsx usa key={id} y remonta Yjs limpio.
+// Crear usa POST /api/diagrams; borrar el actual vuelve al dashboard.
 export interface DiagramInfo {
   id: string;
   name: string;

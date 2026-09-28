@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, API_BASE } from '../lib/apiClient';
 
+// Gestion de colaboradores del diagrama (solo la abre el OWNER desde la
+// toolbar). Invita por username y cambia roles via routes/acl.js. El OWNER
+// no aparece en `members` (es ownerId de la ACL) y no puede auto-eliminarse.
 interface Member {
   userId: string;
   role: 'EDITOR' | 'VIEWER';

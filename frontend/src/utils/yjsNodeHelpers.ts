@@ -2,6 +2,10 @@
 
 import * as Y from 'yjs';
 
+// Puente nodos React Flow <-> Yjs. Cada nodo es un Y.Map con sub-mapas
+// (position, data) y sub-arrays (attributes, methods): asi mover un nodo
+// no reescribe sus atributos (menos trafico, menos conflictos).
+// removeNode tambien borra aristas incidentes (integridad local).
 export interface NodePosition {
   x: number;
   y: number;

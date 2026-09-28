@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 
+// Panel de la arista seleccionada: tipo (asociacion/herencia/...),
+// cardinalidades y conversion a clase asociativa (solo * a *).
+// Igual que EntityEditorPanel: edita copia local, onSave escribe a Yjs.
 interface EdgeData {
   type: 'ASSOCIATION' | 'INHERITANCE' | 'AGGREGATION' | 'COMPOSITION';
   cardinalityFrom: string;

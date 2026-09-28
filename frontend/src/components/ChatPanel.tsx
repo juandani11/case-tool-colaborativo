@@ -3,6 +3,10 @@
 import { useRef, useEffect, memo } from 'react';
 import { ChatMessage } from '../hooks/useCollaborativeFlow';
 
+// UI del asistente de IA: historial + input de texto + microfono. Pura vista:
+// la logica vive en useAICommand (texto/voz/imagen). Los mensajes llegan por
+// Yjs (chat colaborativo), por eso otro peer ve lo que escribes. readOnly
+// (VIEWER) oculta el input pero muestra el historial.
 interface ChatPanelProps {
   messages: ChatMessage[];
   command: string;

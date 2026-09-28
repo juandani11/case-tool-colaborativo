@@ -1,5 +1,7 @@
 'use client';
 
+// Logo UNICO de la app (dashboard, login, register, toolbar): mismo SVG y
+// tipografia Inter en 3 tamanos. Si cambia la marca, se cambia SOLO aqui.
 interface AppLogoProps {
   size?: 'sm' | 'md' | 'lg';
   showSubtitle?: boolean;

@@ -3,6 +3,8 @@ import { EdgeProps } from 'reactflow';
 import UmlEdge, { getEdgeEndVector } from './UmlEdge';
 import { useFloatingEdgeGeometry } from '../utils/floatingEdges';
 
+// Agregacion UML: rombo VACIO en el todo (relacion debil). Marcador orientado
+// por el segmento final, igual que herencia y composicion.
 function AggregationEdge(props: EdgeProps) {
   // Arista flotante: extremos en el borde (centro-a-centro recortado).
   // Sin geometría (self-loop, nodos ausentes) -> coords de React Flow.

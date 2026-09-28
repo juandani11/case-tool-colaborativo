@@ -3,6 +3,11 @@
 import { Node, Edge } from 'reactflow';
 import { EntityNodeData, RelationshipData } from '../types/diagram';
 
+// Backup JSON LOCAL (descarga/subida en el navegador, sin servidor).
+// No confundir con la persistencia en servidor (POST /api/diagrams/:id)
+// ni con XMI (xmiExporter/xmiImporter, formato Enterprise Architect).
+
+
 export interface DiagramData {
   nodes: Node<any>[];
   edges: Edge<any>[];

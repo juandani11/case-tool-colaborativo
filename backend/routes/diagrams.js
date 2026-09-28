@@ -11,10 +11,16 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 const DIAGRAMS_DIR = path.join(__dirname, '..', 'data', 'diagrams');
 
+// Quita todo lo que no sea letra/numero/guion: evita path traversal
+// (un id como "../../secret" quedaria inofensivo). Misma regla que
+// diagramPath() en server.js y aclService: si cambias una, cambia las tres.
 function safeId(diagramId) {
   return String(diagramId || '').replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
+// Lee solo lo necesario para la card del dashboard (nombre + conteos),
+// sin cargar el diagrama entero en memoria. Devuelve null si el archivo
+// esta corrupto para no tumbar todo el listado por un diagrama roto.
 async function readDiagramSummary(file) {
   try {
     const content = await fs.readFile(path.join(DIAGRAMS_DIR, file), 'utf-8');
@@ -37,6 +43,7 @@ router.get('/diagrams', requireAuth, async (req, res) => {
   try {
     await fs.mkdir(DIAGRAMS_DIR, { recursive: true });
     const files = await fs.readdir(DIAGRAMS_DIR);
+    // Los .acl.json son permisos, no diagramas: jamas se listan como cards.
     const diagramFiles = files.filter(f => f.endsWith('.json') && !f.endsWith('.acl.json'));
 
     const owned = [];

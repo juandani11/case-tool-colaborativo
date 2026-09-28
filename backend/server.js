@@ -277,7 +277,9 @@ app.post('/api/ai/from-image', requireAuth, upload.single('image'), async (req, 
   }
 });
 
-// Endpoint de generación de backend (asíncrono)
+// Genera el backend Spring Boot a partir del AST del diagrama.
+// Flujo: valida AST -> generateProject() crea el ZIP en disco temporal ->
+// res.download() lo envia -> se borra el temporal (exito o error).
 app.post('/api/generate', requireAuth, async (req, res) => {
   const { currentState } = req.body;
 
@@ -286,7 +288,7 @@ app.post('/api/generate', requireAuth, async (req, res) => {
   }
 
   try {
-    // Ahora generateProject devuelve una promesa que se resuelve con la ruta del ZIP
+    // generateProject() es async: resuelve con la ruta del ZIP ya empaquetado.
     const zipPath = await generateProject(currentState);
     res.download(zipPath, 'backend-generado.zip', (err) => {
       if (err) {

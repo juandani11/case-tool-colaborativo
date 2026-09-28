@@ -2,6 +2,11 @@
 
 import { EntityNodeData } from '../types/diagram';
 
+// Paleta lateral con DOS modos (solo visible en modo edicion, no VIEWER):
+// - Elementos: drag-and-drop al canvas (ITEMS de abajo).
+// - Relaciones: click en el tipo -> modo conexion (click origen, click
+//   destino). El estado del modo vive en page.tsx, no aqui: la paleta
+//   solo emite la seleccion via RELATIONSHIPS.
 interface PaletteItem {
   id: string;
   label: string;

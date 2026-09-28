@@ -2,6 +2,13 @@ import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { EntityNodeData, Method } from '../types/diagram';
 
+// UNICO tipo de nodo del canvas (nodeTypes.entity en page.tsx): la variante
+// (clase, interfaz, abstracta, nota, asociativa) viaja en data, no en type.
+// Asi Yjs y los diagramas viejos nunca se rompen al agregar variantes.
+// Handles en los 4 lados pero sutiles (aparecen al hover): crear conexiones
+// arrastrando sigue igual, sin ruido visual.
+
+
 const visibilitySymbol = (visibility: Method['visibility']) => {
   switch (visibility) {
     case 'public': return '+';

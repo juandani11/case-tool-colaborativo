@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { nodesToAST, applyMutations } from '../utils/ast';
 import { apiFetch } from '../lib/apiClient';
 import { EntityNodeData, RelationshipData } from '../types/diagram';
 import { Node, Edge } from 'reactflow';
 
+// Base del backend (misma que apiClient). Los 3 handlers comparten patron:
+// nodesToAST -> POST -> applyMutations -> mensaje de resumen en el chat.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1234';
 
 function buildMutationSummary(mutations: any[]): string {
@@ -35,58 +37,93 @@ interface AICommandOptions {
 }
 
 export function useAICommand(options: AICommandOptions) {
-  const [command, setCommand] = useState('');
+  const [command, setCommandState] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isFromImage, setIsFromImage] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  // Espejos sincronos del estado para callbacks diferidos (onstop de
+  // MediaRecorder, setTimeout de auto-envio): el state de React llega tarde
+  // a esos closures, los refs siempre estan al dia.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  const commandRef = useRef('');
+  const processingRef = useRef(false);
+  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSendCommand = async () => {
-    if (!command.trim() || isProcessing) return;
+  // Setter que mantiene commandRef sincronizado (el input lo llama con string).
+  const setCommand = useCallback((value: string) => {
+    commandRef.current = value;
+    setCommandState(value);
+  }, []);
+
+  // Limpia el auto-envio pendiente al desmontar (no enviar a un editor cerrado).
+  useEffect(() => {
+    return () => {
+      if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+    };
+  }, []);
+
+  // Núcleo de envío: texto explícito + guard anti-doble-envío (vacío o ya
+  // procesando). Estable entre renders para que onstop/timeout lo llamen sin
+  // closures viejos; lee nodos/aristas vigentes vía optionsRef. processingRef
+  // (síncrono) cubre la carrera que el state isProcessing (async) no ve:
+  // Enter manual + auto-envío de voz en la misma ventana de tiempo.
+  const sendCommandText = useCallback(async (text: string) => {
+    const trimmed = (text || '').trim();
+    if (!trimmed || processingRef.current) return;
+    processingRef.current = true;
     setIsProcessing(true);
-    options.addMessage('user', command.trim());
+    const opts = optionsRef.current;
+    opts.addMessage('user', trimmed);
     try {
-      const ast = nodesToAST(options.nodes, options.edges);
+      const ast = nodesToAST(opts.nodes, opts.edges);
       const response = await apiFetch(`${API_BASE}/api/ai/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command, currentState: ast }),
+        body: JSON.stringify({ command: trimmed, currentState: ast }),
       });
 
       if (!response.ok) {
         const error = await response.json();
         const errorMsg = 'Error: ' + (error.error || 'Error desconocido');
-        options.addMessage('ia', errorMsg);
+        opts.addMessage('ia', errorMsg);
         return;
       }
 
       const data = await response.json();
       if (data.mutations && data.mutations.length > 0) {
         applyMutations(data.mutations, {
-          nodes: options.nodes,
-          edges: options.edges,
-          addNode: options.addNode,
-          updateNode: options.updateNode,
-          addEdge: options.addEdge,
-          removeNode: options.removeNode,
-          removeEdge: options.removeEdge,
+          nodes: opts.nodes,
+          edges: opts.edges,
+          addNode: opts.addNode,
+          updateNode: opts.updateNode,
+          addEdge: opts.addEdge,
+          removeNode: opts.removeNode,
+          removeEdge: opts.removeEdge,
         });
         const summary = buildMutationSummary(data.mutations);
         const explanation = data.explanation ? `\n\n${data.explanation}` : '';
-        options.addMessage('ia', summary + explanation);
+        opts.addMessage('ia', summary + explanation);
         setCommand('');
       } else {
-        options.addMessage('ia', 'La IA no devolvió cambios.');
+        opts.addMessage('ia', 'La IA no devolvió cambios.');
       }
     } catch (error) {
       console.error('Error al comunicarse con el servidor:', error);
-      options.addMessage('ia', 'No se pudo conectar con el servidor de IA.');
+      opts.addMessage('ia', 'No se pudo conectar con el servidor de IA.');
     } finally {
+      processingRef.current = false;
       setIsProcessing(false);
     }
-  };
+  }, [setCommand]);
+
+  // Flujo por texto (Enter/botón): envía lo que hay en el input ahora mismo.
+  const handleSendCommand = useCallback(() => {
+    sendCommandText(commandRef.current);
+  }, [sendCommandText]);
 
   const handleVoiceCommand = useCallback(async () => {
     if (isRecording) {
@@ -115,12 +152,12 @@ export function useAICommand(options: AICommandOptions) {
 
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
         if (blob.size === 0) {
-          options.addMessage('system', 'No se grabó audio.');
+          optionsRef.current.addMessage('system', 'No se grabó audio.');
           return;
         }
 
         setIsProcessing(true);
-        options.addMessage('system', 'Transcribiendo audio...');
+        optionsRef.current.addMessage('system', 'Transcribiendo audio...');
         try {
           const formData = new FormData();
           formData.append('audio', blob, 'recording.webm');
@@ -132,20 +169,30 @@ export function useAICommand(options: AICommandOptions) {
 
           if (!res.ok) {
             const err = await res.json();
-            options.addMessage('ia', 'Error de transcripción: ' + (err.error || 'Error desconocido'));
+            optionsRef.current.addMessage('ia', 'Error de transcripción: ' + (err.error || 'Error desconocido'));
             return;
           }
 
           const data = await res.json();
           if (data.text && data.text.trim()) {
-            setCommand(data.text.trim());
-            options.addMessage('system', `Transcripción: "${data.text.trim()}"`);
+            const transcript = data.text.trim();
+            setCommand(transcript);
+            optionsRef.current.addMessage('system', `Transcripción: "${transcript}"`);
+            // Auto-envío: el usuario ya habló, no debe presionar Enviar.
+            // Delay para que vea el texto antes de que se procese; se lee el
+            // input VIGENTE (no el transcript capturado): si lo vació con un
+            // Enter manual en esos 400 ms, el guard de sendCommandText no envía.
+            // Transcripción vacía o fallida: no se envía nada.
+            if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+            autoSendTimerRef.current = setTimeout(() => {
+              sendCommandText(commandRef.current);
+            }, 400);
           } else {
-            options.addMessage('system', 'No se detectó voz en el audio.');
+            optionsRef.current.addMessage('system', 'No se detectó voz en el audio.');
           }
         } catch (err) {
           console.error('Error transcribiendo:', err);
-          options.addMessage('ia', 'No se pudo conectar con el servicio de transcripción.');
+          optionsRef.current.addMessage('ia', 'No se pudo conectar con el servicio de transcripción.');
         } finally {
           setIsProcessing(false);
         }
@@ -157,14 +204,14 @@ export function useAICommand(options: AICommandOptions) {
     } catch (err: any) {
       console.error('Error accediendo al micrófono:', err);
       if (err.name === 'NotAllowedError') {
-        options.addMessage('system', 'Permiso de micrófono denegado. Habilita el acceso en la configuración del navegador.');
+        optionsRef.current.addMessage('system', 'Permiso de micrófono denegado. Habilita el acceso en la configuración del navegador.');
       } else if (err.name === 'NotFoundError') {
-        options.addMessage('system', 'No se encontró un micrófono conectado.');
+        optionsRef.current.addMessage('system', 'No se encontró un micrófono conectado.');
       } else {
-        options.addMessage('ia', 'Error al acceder al micrófono: ' + err.message);
+        optionsRef.current.addMessage('ia', 'Error al acceder al micrófono: ' + err.message);
       }
     }
-  }, [isRecording, options]);
+  }, [isRecording, sendCommandText]);
 
   const handleFromImage = useCallback(async (file: File) => {
     if (isProcessing || isFromImage) return;

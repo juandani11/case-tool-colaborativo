@@ -4,6 +4,10 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 
+// Redirector de "/": no renderiza nada util, solo decide destino.
+// Sin auth -> editor directo (ultimo diagrama o diagram-1, modo historico).
+// Con auth -> /login sin sesion, /dashboard con sesion.
+// Espera `loading`: redirigir antes de saber si auth esta activo rompe el flujo.
 const LAST_DIAGRAM_KEY = 'uml-editor-current-diagram';
 
 export default function RootPage() {

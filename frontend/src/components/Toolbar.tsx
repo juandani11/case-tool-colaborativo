@@ -5,10 +5,16 @@ import { useRouter } from 'next/navigation';
 import RelationTypeSelector from './RelationTypeSelector';
 import PresencePanel from './PresencePanel';
 import UserMenu from './UserMenu';
+import { HelpModal } from './HelpModal';
+import { useHelpModal } from '../hooks/useHelpModal';
 import { ConnectedUser } from '../hooks/useCollaborativeFlow';
 import { DS } from '../styles/design-system';
 import AppLogo from './AppLogo';
 
+// Barra superior del editor: acciones de diagrama (Entidad, Conexion),
+// archivo (JSON/XMI, Importar, Desde imagen, Generar), Chat, Miembros,
+// Ayuda, presencia, estado de conexion y usuario. Es controlada: toda la
+// logica vive en page.tsx via props; aqui solo UI + inputs file ocultos.
 interface ToolbarProps {
   isConnected: boolean;
   onAddEntity: () => void;
@@ -55,6 +61,7 @@ export default function Toolbar({
   const xmiInputRef = useRef<HTMLInputElement>(null);
   const [showRelationSelector, setShowRelationSelector] = useState(false);
   const router = useRouter();
+  const help = useHelpModal();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,6 +88,7 @@ export default function Toolbar({
   };
 
   return (
+    <>
     <div className="h-11 bg-white border-b border-gray-200 flex items-center px-3 gap-1 text-sm relative z-20 flex-shrink-0">
       {/* Logo / Title */}
       <div className="flex items-center gap-2 pr-3 border-r border-gray-200 mr-1">
@@ -228,6 +236,14 @@ export default function Toolbar({
 
       <div className="flex-1" />
 
+      {/* Help */}
+      <ToolButton onClick={help.open} tooltip="Abrir manual de usuario (F1)">
+        <span>❓</span>
+        <span className="hidden md:inline">Ayuda</span>
+      </ToolButton>
+
+      <div className="w-px h-5 bg-gray-200 mx-1" />
+
       {/* Presence */}
       {connectedUsers && connectedUsers.length > 0 && (
         <>
@@ -247,6 +263,8 @@ export default function Toolbar({
       {/* Usuario (solo visible con AUTH_ENABLED=true y sesión) */}
       <UserMenu />
     </div>
+    <HelpModal isOpen={help.isOpen} onClose={help.close} />
+    </>
   );
 }
 

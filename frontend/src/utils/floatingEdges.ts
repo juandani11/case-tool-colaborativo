@@ -27,6 +27,8 @@ export interface FloatingGeometry {
   targetPosition: Position;
 }
 
+// Medida supuesta cuando React Flow aun no midio el nodo (primer render).
+// Evita division por cero y saltos visuales; en cuanto hay medida real se usa esa.
 const DEFAULT_W = 200;
 const DEFAULT_H = 100;
 

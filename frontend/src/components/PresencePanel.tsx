@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { ConnectedUser } from '../hooks/useCollaborativeFlow';
 
+// Avatares de usuarios conectados (toolbar). Pura vista de `connectedUsers`
+// (los calcula useCollaborativeFlow desde el awareness). Max 5 visibles + "+N"
+// con tooltip; vacio no renderiza nada. Deduplica por usuario (2 pestanas = 1 avatar).
 interface PresencePanelProps {
   users: ConnectedUser[];
 }

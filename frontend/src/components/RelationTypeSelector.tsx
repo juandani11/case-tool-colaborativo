@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 
+// Desplegable del boton "Conexion" en la toolbar (legacy del selector de
+// tipo). El flujo actual usa el modo conexion de la paleta (Palette.tsx);
+// este componente queda para compatibilidad donde aun se monta.
 type RelationshipType = 'ASSOCIATION' | 'INHERITANCE' | 'AGGREGATION' | 'COMPOSITION';
 
 interface RelationTypeSelectorProps {

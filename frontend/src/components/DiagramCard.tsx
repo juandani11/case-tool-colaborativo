@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 
+// Card del dashboard: nombre, conteos, fecha relativa, badge de rol
+// (OWNER azul, EDITOR verde, VIEWER gris) y dueno si es compartido.
+// Pura vista del summary que devuelve GET /api/diagrams.
 interface Props {
   diagram: {
     id: string;

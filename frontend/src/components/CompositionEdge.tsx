@@ -3,6 +3,8 @@ import { EdgeProps } from 'reactflow';
 import UmlEdge, { getEdgeEndVector } from './UmlEdge';
 import { useFloatingEdgeGeometry } from '../utils/floatingEdges';
 
+// Composicion UML: rombo LLENO en el todo (relacion fuerte, ciclo de vida
+// compartido). Marcador orientado por el segmento final.
 function CompositionEdge(props: EdgeProps) {
   // Arista flotante: extremos en el borde (centro-a-centro recortado).
   // Sin geometría (self-loop, nodos ausentes) -> coords de React Flow.

@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import { WebsocketProvider } from 'y-websocket';
 
+// Soft-lock VISUAL (no bloquea en Yjs): lee el campo `editing` del awareness
+// y devuelve que nodo edita quien. Expira a 30 s para no dejar locks
+// colgados si un peer se cae sin limpiar. El editor pone draggable:false
+// en nodos ajenos a partir de este mapa.
 interface NodeLock {
   name: string;
   color: string;

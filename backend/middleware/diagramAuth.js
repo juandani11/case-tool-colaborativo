@@ -8,6 +8,8 @@ function enabled() {
   return process.env.AUTH_ENABLED === 'true';
 }
 
+// Las rutas usan dos nombres para lo mismo (:diagramId en acl.js, :id en
+// server.js). Este helper acepta ambos para no duplicar middlewares.
 function diagramIdOf(req) {
   return req.params.diagramId || req.params.id;
 }

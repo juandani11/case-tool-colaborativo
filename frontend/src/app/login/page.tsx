@@ -7,6 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import AppLogo from '../../components/AppLogo';
 import { DS } from '../../styles/design-system';
 
+// Login: formulario -> AuthContext.login() (POST /api/auth/login, guarda JWT)
+// -> /dashboard. El error del backend se muestra tal cual (401 credenciales).
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

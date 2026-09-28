@@ -110,7 +110,9 @@ router.patch(
 
 /**
  * DELETE /api/diagrams/:diagramId/members/:userId — eliminar miembro.
- * El OWNER elimina a cualquiera; cualquiera puede eliminarse a sí mismo.
+ * El OWNER elimina a cualquiera; cualquiera puede eliminarse a sí mismo
+ * (salirse del diagrama). El OWNER no puede auto-eliminarse: antes debe
+ * transferir o borrar el diagrama (lo valida aclService.removeMember).
  */
 router.delete(
   '/diagrams/:diagramId/members/:userId',

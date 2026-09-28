@@ -3,6 +3,8 @@ import { EdgeProps } from 'reactflow';
 import UmlEdge from './UmlEdge';
 import { useFloatingEdgeGeometry } from '../utils/floatingEdges';
 
+// Asociacion UML: linea simple sin marcador. Delega path, cardinalidades y
+// seleccion en UmlEdge; solo ajusta la geometria a flotante (borde a borde).
 function AssociationEdge(props: EdgeProps) {
   // Arista flotante: extremos en el borde (centro-a-centro recortado).
   // Sin geometría (self-loop, nodos ausentes) -> coords de React Flow.

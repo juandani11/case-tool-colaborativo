@@ -3,6 +3,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { apiFetch, getToken, setToken, clearToken, API_BASE } from '../lib/apiClient';
 
+// Sesion global: user, si el backend exige auth, login/register/logout.
+// Al montar pregunta /status y valida el token contra /me (no decodifica
+// JWT en cliente). Si el backend no responde, queda en modo abierto para
+// no romper el editor en demo local.
 export interface AuthUser {
   id: string;
   username: string;

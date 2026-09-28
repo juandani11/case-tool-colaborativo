@@ -32,6 +32,9 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+// Usuario visible en PresencePanel. clientId = conexion (cambia al
+// reconectar); id = identidad estable (user.id o anon por pestana).
+// Deduplicar SIEMPRE por id, no por clientId (2 pestanas = 1 avatar).
 export interface ConnectedUser {
   clientId: number;
   id: string;

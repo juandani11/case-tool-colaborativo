@@ -3,6 +3,9 @@ import { EdgeProps } from 'reactflow';
 import UmlEdge, { getEdgeEndVector } from './UmlEdge';
 import { useFloatingEdgeGeometry } from '../utils/floatingEdges';
 
+// Herencia UML: linea CONTINUA + triangulo hueco hacia el padre. El triangulo
+// se orienta por el SEGMENTO FINAL (eje del handle destino), no por el vector
+// recto: con codos de 90 el vector recto lo dejaria girado.
 function InheritanceEdge(props: EdgeProps) {
   // Arista flotante: extremos en el borde (centro-a-centro recortado).
   // Sin geometría (self-loop, nodos ausentes) -> coords de React Flow.
