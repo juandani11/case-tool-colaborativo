@@ -11,11 +11,20 @@
       "data": {
         "label": "NuevaClase",
         "stereotype": "class",
-        "attributes": [],
+        "attributes": [
+          {
+            "id": "attr_1791144474149_x2epl",
+            "name": "edad",
+            "type": "Integer",
+            "isPk": false,
+            "nullable": true,
+            "unique": false
+          }
+        ],
         "methods": []
       },
       "width": 220,
-      "height": 72
+      "height": 90
     },
     {
       "id": "entity_1790157157357_5dyc",
