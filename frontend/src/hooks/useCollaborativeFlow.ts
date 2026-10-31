@@ -28,6 +28,12 @@ import {
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'ia' | 'system';
+  // Quién habla (username del JWT). Permite que el chat público muestre el
+  // nombre real de cada participante, no solo "Tú".
+  author?: string;
+  // Identidad estable del emisor (user.id o anon por pestaña). Permite
+  // distinguir los mensajes propios incluso cuando todos se llaman "Anónimo".
+  clientId?: string;
   text: string;
   timestamp: number;
 }
@@ -54,13 +60,14 @@ function teardown(
   }
 }
 
-export function useCollaborativeFlow(roomName: string) {
+export function useCollaborativeFlow(roomName: string, enabled = true) {
   const [nodes, setNodes] = useState<any[]>([]);
   const [edges, setEdges] = useState<any[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
 
+  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
   const ychatRef = useRef<Y.Array<ChatMessage> | null>(null);
@@ -88,6 +95,11 @@ export function useCollaborativeFlow(roomName: string) {
     providerRef.current = null;
     ydocRef.current = null;
 
+    if (!enabled) {
+      teardown(prevProvider, prevDoc);
+      return;
+    }
+
     // ── 2. Create fresh doc + provider ──────────────────────────────
     const doc = new Y.Doc();
     const provider = new WebsocketProvider(
@@ -100,6 +112,7 @@ export function useCollaborativeFlow(roomName: string) {
 
     providerRef.current = provider;
     ydocRef.current = doc;
+    setProvider(provider);
 
     const yn = doc.getMap('nodes');
     const ye = doc.getMap('edges');
@@ -209,13 +222,14 @@ export function useCollaborativeFlow(roomName: string) {
 
       providerRef.current = null;
       ydocRef.current = null;
+      setProvider(null);
       yNodesRef.current = null;
       yEdgesRef.current = null;
       ychatRef.current = null;
       setConnectedUsers([]);
       teardown(cleanupProvider, cleanupDoc);
     };
-  }, [roomName]);
+  }, [roomName, enabled]);
 
   // ── Soft-lock: publicar nodo seleccionado en awareness ───────────
   useEffect(() => {
@@ -374,40 +388,69 @@ export function useCollaborativeFlow(roomName: string) {
     const ye = yEdgesRef.current;
     const ychat = ychatRef.current;
     if (!yn || !ye || !ychat) return;
+    // Siembra por canal: si el grafo ya está vivo (otro peer) no lo tocamos,
+    // pero un chat huérfano (p. ej. mensaje emitido por el backend antes de
+    // que entrara nadie) no debe impedir cargar nodos/aristas desde el REST.
+    const hasGraph = yn.size > 0 || ye.size > 0;
+    const hasChat = ychat.length > 0;
+    if (hasGraph && hasChat) return;
 
     docTransact(ydocRef.current, () => {
-      yn.clear();
-      ye.clear();
-      if (ychat.length > 0) ychat.delete(0, ychat.length);
-      if (Array.isArray(data.nodes)) {
-        data.nodes.forEach((node: any) => yAddNode(yn, node));
+      if (!hasGraph) {
+        yn.clear();
+        ye.clear();
+        if (Array.isArray(data.nodes)) {
+          data.nodes.forEach((node: any) => yAddNode(yn, node));
+        }
+        if (Array.isArray(data.edges)) {
+          data.edges.forEach((edge: any) => yAddEdge(ye, edge));
+        }
       }
-      if (Array.isArray(data.edges)) {
-        data.edges.forEach((edge: any) => yAddEdge(ye, edge));
-      }
-      if (Array.isArray(data.chat)) {
+      if (!hasChat && Array.isArray(data.chat)) {
         data.chat.forEach((msg) => ychat.push([msg]));
       }
     });
   }, []);
 
-  const addMessage = useCallback((sender: 'user' | 'ia' | 'system', text: string) => {
-    const ychat = ychatRef.current;
-    if (!ychat) return;
-    const msg: ChatMessage = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      sender,
-      text,
-      timestamp: Date.now(),
-    };
-    ychat.push([msg]);
-  }, []);
+  const addMessage = useCallback(
+    (sender: 'user' | 'ia' | 'system', text: string, author?: string) => {
+      const ychat = ychatRef.current;
+      if (!ychat) return;
+      // El autor de los mensajes de usuario sale de la sesión (JWT), no del
+      // llamador, para que cada peer vea el nombre real de quien preguntó.
+      const resolvedAuthor =
+        author ||
+        (sender === 'user'
+          ? userRef.current?.username || sessionIdentity.current.name || 'Usuario'
+          : sender === 'ia'
+          ? 'IA'
+          : undefined);
+      const msg: ChatMessage = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        sender,
+        author: resolvedAuthor,
+        text,
+        timestamp: Date.now(),
+      };
+      if (sender === 'user') {
+        msg.clientId = userRef.current?.id || sessionIdentity.current.id;
+      }
+      ychat.push([msg]);
+    },
+    []
+  );
+
+  const currentUsername = user?.username || 'Anónimo';
+  const [anonymousClientId] = useState(() => getOrCreateSessionIdentity().id);
+  const currentClientId = user?.id || anonymousClientId;
 
   return {
     nodes,
     edges,
     messages,
     addMessage,
+    currentUsername,
+    currentClientId,
     onNodesChange,
     onEdgesChange,
     onNodeDragStop,
@@ -423,8 +466,8 @@ export function useCollaborativeFlow(roomName: string) {
     loadDiagramData,
     isConnected,
     connectedUsers,
+    provider,
     providerRef,
-    getSnapshot: () => ({ nodes: nodesRef.current, edges: edgesRef.current, messages: ychatRef.current?.toArray() || [] }),
   };
 }
 

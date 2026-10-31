@@ -7,8 +7,17 @@ import { EntityNodeData, RelationshipData } from '../types/diagram';
 import { Node, Edge } from 'reactflow';
 
 // Base del backend (misma que apiClient). Los 3 handlers comparten patron:
-// nodesToAST -> POST -> applyMutations -> mensaje de resumen en el chat.
+// nodesToAST -> POST -> si hay mutaciones, applyMutations; si no (consulta
+// teórica), solo se publica la respuesta en el chat sin tocar el diagrama.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1234';
+
+// Personaliza un texto con el nombre que el backend extrajo del JWT.
+// Fallback por si el LLM no devolvió "explanation": la respuesta igualmente
+// se dirige al usuario por su nombre.
+function addressUser(username: unknown, text: string): string {
+  const name = typeof username === 'string' ? username.trim() : '';
+  return name && name !== 'Usuario' ? `${name}, ${text}` : text;
+}
 
 function buildMutationSummary(mutations: any[]): string {
   const counts: Record<string, number> = {};
@@ -26,6 +35,9 @@ function buildMutationSummary(mutations: any[]): string {
 }
 
 interface AICommandOptions {
+  // Diagrama actual: el backend emite la respuesta de la IA al chat Yjs de
+  // esta sala (`diagram-room-<id>`), para que la vean todos los conectados.
+  diagramId: string;
   nodes: Node<EntityNodeData>[];
   edges: Edge<RelationshipData>[];
   addNode: (node: Node<EntityNodeData>) => void;
@@ -33,7 +45,7 @@ interface AICommandOptions {
   removeNode: (id: string) => void;
   addEdge: (edge: Edge<RelationshipData>) => void;
   removeEdge: (id: string) => void;
-  addMessage: (sender: 'user' | 'ia' | 'system', text: string) => void;
+  addMessage: (sender: 'user' | 'ia' | 'system', text: string, author?: string) => void;
 }
 
 export function useAICommand(options: AICommandOptions) {
@@ -83,7 +95,11 @@ export function useAICommand(options: AICommandOptions) {
       const response = await apiFetch(`${API_BASE}/api/ai/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: trimmed, currentState: ast }),
+        body: JSON.stringify({
+          command: trimmed,
+          currentState: ast,
+          diagramId: opts.diagramId,
+        }),
       });
 
       if (!response.ok) {
@@ -94,7 +110,16 @@ export function useAICommand(options: AICommandOptions) {
       }
 
       const data = await response.json();
-      if (data.mutations && data.mutations.length > 0) {
+      // "response" es la respuesta del tutor; "explanation" se mantiene como
+      // fallback por compatibilidad con versiones anteriores del backend.
+      const aiText =
+        typeof data.response === 'string'
+          ? data.response.trim()
+          : typeof data.explanation === 'string'
+          ? data.explanation.trim()
+          : '';
+
+      if (Array.isArray(data.mutations) && data.mutations.length > 0) {
         applyMutations(data.mutations, {
           nodes: opts.nodes,
           edges: opts.edges,
@@ -104,13 +129,18 @@ export function useAICommand(options: AICommandOptions) {
           removeNode: opts.removeNode,
           removeEdge: opts.removeEdge,
         });
-        const summary = buildMutationSummary(data.mutations);
-        const explanation = data.explanation ? `\n\n${data.explanation}` : '';
-        opts.addMessage('ia', summary + explanation);
-        setCommand('');
-      } else {
-        opts.addMessage('ia', 'La IA no devolvió cambios.');
       }
+
+      const hasMutations = Array.isArray(data.mutations) && data.mutations.length > 0;
+      const fallbackText = hasMutations
+        ? addressUser(data.username, buildMutationSummary(data.mutations))
+        : 'No se modificó el diagrama.';
+      // El backend ya publicó la respuesta en el chat Yjs de la sala. Solo la
+      // añadimos localmente si no pudo emitirla (evita duplicados).
+      if (data.chatEmitted !== true) {
+        opts.addMessage('ia', aiText || fallbackText, 'IA');
+      }
+      setCommand('');
     } catch (error) {
       console.error('Error al comunicarse con el servidor:', error);
       opts.addMessage('ia', 'No se pudo conectar con el servidor de IA.');

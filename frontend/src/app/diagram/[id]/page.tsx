@@ -82,6 +82,18 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const [diagramsLoaded, setDiagramsLoaded] = useState(false);
   const initializedRef = useRef(false);
 
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [connectionType, setConnectionType] = useState<UmlRelationshipType>('ASSOCIATION');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
+
+  // ── Modo conexion (paleta de relaciones) ─────────────────────────
+  const [activeRelationType, setActiveRelationType] = useState<string | null>(null);
+  const [pendingSource, setPendingSource] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+
   // Navegar entre diagramas recarga la ruta (el key del padre remonts todo)
   const navigateToDiagram = useCallback((id: string) => {
     router.push(`/diagram/${id}`);
@@ -109,16 +121,26 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
             setDiagramsLoaded(true);
             return;
           }
-          // No diagrams on server — create default and save it
-          const defaultList: DiagramInfo[] = [{ id: 'diagram-1', name: 'Diagrama 1' }];
-          setDiagrams(defaultList);
-          setCurrentDiagramId('diagram-1');
-          setDiagramsLoaded(true);
-          apiFetch(`${API_BASE}/api/diagrams/diagram-1`, {
+          // No diagrams on server — create one atomically (diagram + ACL).
+          apiFetch(`${API_BASE}/api/diagrams`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Diagrama 1', nodes: [], edges: [], chat: [] }),
-          }).catch(() => {});
+            body: JSON.stringify({ name: 'Diagrama 1' }),
+          })
+            .then(r => r.json())
+            .then((created: { id?: string; name?: string }) => {
+              if (!created?.id) throw new Error('El servidor no devolvió el diagrama creado');
+              const defaultList: DiagramInfo[] = [{ id: created.id, name: created.name || 'Diagrama 1' }];
+              setDiagrams(defaultList);
+              setCurrentDiagramId(created.id);
+              setDiagramsLoaded(true);
+            })
+            .catch(() => {
+              const fallbackList: DiagramInfo[] = [{ id: 'diagram-1', name: 'Diagrama 1' }];
+              setDiagrams(fallbackList);
+              setCurrentDiagramId('diagram-1');
+              setDiagramsLoaded(true);
+            });
           return;
         }
 
@@ -168,7 +190,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
         setCurrentDiagramId(fallbackId);
         setDiagramsLoaded(true);
       });
-  }, []);
+  }, [initialDiagramId]);
 
   const currentRoom = `diagram-room-${currentDiagramId || 'diagram-1'}`;
 
@@ -234,6 +256,8 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     edges,
     messages,
     addMessage,
+    currentUsername,
+    currentClientId,
     onNodesChange,
     onEdgesChange,
     onNodeDragStop,
@@ -247,12 +271,11 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     loadDiagramData,
     isConnected,
     connectedUsers,
-    providerRef,
+    provider,
     updateEdge,
-    getSnapshot,
-  } = useCollaborativeFlow(currentRoom);
+  } = useCollaborativeFlow(currentRoom, diagramsLoaded && Boolean(currentDiagramId));
 
-  const nodeLocks = useNodeLocks(providerRef.current);
+  const nodeLocks = useNodeLocks(provider);
 
   // Load diagram data from server when switching diagrams (or on first load)
   useEffect(() => {
@@ -272,32 +295,10 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [currentDiagramId, diagramsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentDiagramId, diagramsLoaded, initialDiagramId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Resetear modo conexion al cambiar de diagrama
-  useEffect(() => {
-    setActiveRelationType(null);
-    setPendingSource(null);
-  }, [currentDiagramId]);
-
-  // Debounce save to server (1 second after last change)
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (nodes.length === 0 && edges.length === 0 && messages.length === 0) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const snapshot = getSnapshot();
-      const diagram = diagrams.find(d => d.id === currentDiagramId);
-      apiFetch(`${API_BASE}/api/diagrams/${currentDiagramId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...snapshot, name: diagram?.name }),
-      }).catch(() => {});
-    }, 1000);
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [nodes, edges, messages, currentDiagramId, getSnapshot, diagrams]);
+  // El reset de modo conexion no hace falta: el componente se remonta con
+  // key={diagramId} al navegar (ver DiagramPage), así que el estado nace limpio.
 
   const {
     command,
@@ -309,6 +310,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     handleVoiceCommand,
     handleFromImage,
   } = useAICommand({
+    diagramId: currentDiagramId || '',
     nodes,
     edges,
     addNode,
@@ -356,18 +358,6 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     },
     [reactFlow, addNode]
   );
-
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [connectionType, setConnectionType] = useState<UmlRelationshipType>('ASSOCIATION');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
-  const [isMembersOpen, setIsMembersOpen] = useState(false);
-
-  // ── Modo conexion (paleta de relaciones) ─────────────────────────
-  const [activeRelationType, setActiveRelationType] = useState<string | null>(null);
-  const [pendingSource, setPendingSource] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
 
   // Cancelar modo conexion con Escape
   useEffect(() => {
@@ -899,6 +889,8 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
           isOpen={isChatOpen}
           onToggle={() => setIsChatOpen(!isChatOpen)}
           readOnly={isViewer}
+          currentUsername={currentUsername}
+          currentClientId={currentClientId}
         />
       </div>
     </div>

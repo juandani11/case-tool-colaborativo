@@ -1,116 +1,34 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { apiFetch, API_BASE } from '../lib/apiClient';
+import { useState } from 'react';
+import { useDiagramMembers } from '../hooks/useDiagramMembers';
 
-// Gestion de colaboradores del diagrama (solo la abre el OWNER desde la
-// toolbar). Invita por username y cambia roles via routes/acl.js. El OWNER
-// no aparece en `members` (es ownerId de la ACL) y no puede auto-eliminarse.
-interface Member {
-  userId: string;
-  role: 'EDITOR' | 'VIEWER';
-  username?: string;
-  email?: string;
-  addedAt?: string;
-}
-
-interface Owner {
-  id: string;
-  username: string;
-  email?: string;
-}
-
+// Vista de colaboradores: la logica de API y estado vive en useDiagramMembers.
 interface MembersPanelProps {
   diagramId: string;
   onClose: () => void;
 }
 
 export default function MembersPanel({ diagramId, onClose }: MembersPanelProps) {
-  const [owner, setOwner] = useState<Owner | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const {
+    owner,
+    members,
+    loading,
+    error,
+    busy,
+    invite,
+    changeRole,
+    removeMember,
+  } = useDiagramMembers(diagramId);
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<'EDITOR' | 'VIEWER'>('EDITOR');
-  const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await apiFetch(`${API_BASE}/api/diagrams/${diagramId}/acl`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'No se pudo cargar la lista');
-      }
-      const data = await res.json();
-      setOwner(data.owner || null);
-      setMembers(data.members || []);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [diagramId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    if (!inviteName.trim()) return;
-    setBusy(true);
-    setError('');
-    try {
-      const res = await apiFetch(`${API_BASE}/api/diagrams/${diagramId}/members`, {
-        method: 'POST',
-        body: JSON.stringify({ username: inviteName.trim(), role: inviteRole }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'No se pudo invitar');
-      }
-      setInviteName('');
-      await load();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleRoleChange(userId: string, role: 'EDITOR' | 'VIEWER') {
-    setError('');
-    try {
-      const res = await apiFetch(`${API_BASE}/api/diagrams/${diagramId}/members/${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'No se pudo cambiar el rol');
-      }
-      await load();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  }
-
-  async function handleRemove(userId: string) {
-    setError('');
-    try {
-      const res = await apiFetch(`${API_BASE}/api/diagrams/${diagramId}/members/${userId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'No se pudo eliminar');
-      }
-      await load();
-    } catch (err: any) {
-      setError(err.message);
-    }
+    const username = inviteName.trim();
+    if (!username) return;
+    const ok = await invite(username, inviteRole);
+    if (ok) setInviteName('');
   }
 
   return (
@@ -166,14 +84,14 @@ export default function MembersPanel({ diagramId, onClose }: MembersPanelProps) 
                       </span>
                       <select
                         value={m.role}
-                        onChange={(e) => handleRoleChange(m.userId, e.target.value as 'EDITOR' | 'VIEWER')}
+                        onChange={(e) => changeRole(m.userId, e.target.value as 'EDITOR' | 'VIEWER')}
                         className="text-[11px] border border-gray-200 rounded px-1.5 py-1 bg-white"
                       >
                         <option value="EDITOR">Editor</option>
                         <option value="VIEWER">Lector</option>
                       </select>
                       <button
-                        onClick={() => handleRemove(m.userId)}
+                        onClick={() => removeMember(m.userId)}
                         className="text-gray-300 hover:text-red-500 transition-colors text-xs px-1"
                         title="Eliminar"
                       >

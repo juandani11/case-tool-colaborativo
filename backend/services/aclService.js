@@ -1,84 +1,150 @@
-// CRUD de ACLs por diagrama (Fase 2A).
-// Cada <diagramId>.json tiene un hermano <diagramId>.acl.json con
-// { diagramId, ownerId, members: [{ userId, role, addedAt }] }.
-const fs = require('fs').promises;
-const path = require('path');
-
-const DIAGRAMS_DIR = path.join(__dirname, '..', 'data', 'diagrams');
+// CRUD de ACLs por diagrama persistido en PostgreSQL (auth.diagram_acl).
+// Cada fila es (diagram_id, user_id, role). El OWNER también es una fila.
+const { pool, withTransaction, normalizeUserId, isValidUserId } = require('../db');
+const { httpError } = require('../errors');
 
 function safeId(diagramId) {
-  // Misma sanitización que diagramPath() en server.js
   return String(diagramId || '').replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
-function aclPath(diagramId) {
-  return path.join(DIAGRAMS_DIR, `${safeId(diagramId)}.acl.json`);
+function requireUserId(userId) {
+  const id = String(userId || '').trim();
+  if (!isValidUserId(id)) throw httpError(400, 'ID de usuario inválido');
+  return id;
+}
+
+async function readACLWith(queryable, diagramId) {
+  const id = safeId(diagramId);
+  if (!id) return null;
+  const { rows } = await queryable.query(
+    `SELECT user_id, role, granted_at
+     FROM auth.diagram_acl
+     WHERE diagram_id = $1
+     ORDER BY granted_at ASC`,
+    [id]
+  );
+  if (!rows.length) return null;
+
+  const ownerRow = rows.find(row => row.role === 'OWNER') || rows[0];
+  const members = rows
+    .filter(row => row.user_id !== ownerRow.user_id)
+    .map(row => ({
+      userId: row.user_id,
+      role: row.role,
+      addedAt: row.granted_at instanceof Date ? row.granted_at.toISOString() : row.granted_at,
+    }));
+  const dates = rows
+    .map(row => (row.granted_at instanceof Date ? row.granted_at : new Date(row.granted_at)))
+    .filter(date => !Number.isNaN(date.getTime()));
+
+  return {
+    diagramId: id,
+    ownerId: ownerRow.user_id,
+    members,
+    createdAt: dates.length ? new Date(Math.min(...dates.map(d => d.getTime()))).toISOString() : null,
+    updatedAt: dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))).toISOString() : null,
+  };
 }
 
 async function readACL(diagramId) {
-  try {
-    const content = await fs.readFile(aclPath(diagramId), 'utf-8');
-    const parsed = JSON.parse(content);
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  return readACLWith(pool, diagramId);
 }
 
+// Reemplaza el ACL completo. Se conserva por compatibilidad con llamadas
+// antiguas, aunque las rutas nuevas usan addMember/removeMember.
 async function writeACL(diagramId, acl) {
-  acl.updatedAt = new Date().toISOString();
-  await fs.mkdir(DIAGRAMS_DIR, { recursive: true });
-  await fs.writeFile(aclPath(diagramId), JSON.stringify(acl, null, 2), 'utf-8');
+  const id = safeId(diagramId);
+  if (!id) throw httpError(400, 'ID de diagrama inválido');
+  const ownerId = normalizeUserId(acl?.ownerId);
+  const members = Array.isArray(acl?.members) ? acl.members : [];
+
+  return withTransaction(async (client) => {
+    await client.query('DELETE FROM auth.diagram_acl WHERE diagram_id = $1', [id]);
+    await client.query(
+      `INSERT INTO auth.diagram_acl (diagram_id, user_id, role)
+       VALUES ($1, $2, 'OWNER')`,
+      [id, ownerId]
+    );
+    for (const member of members) {
+      if (!member?.userId || !member?.role) continue;
+      if (!['EDITOR', 'VIEWER'].includes(member.role)) continue;
+      await client.query(
+        `INSERT INTO auth.diagram_acl (diagram_id, user_id, role)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (diagram_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+        [id, requireUserId(member.userId), member.role]
+      );
+    }
+    return readACLWith(client, id);
+  });
 }
 
-// Idempotente: si ya existe, la devuelve sin recrear.
+// Idempotente: si el diagrama ya tiene ACL, la devuelve sin recrearla.
 async function getOrCreateACL(diagramId, userId = 'anonymous') {
-  const existing = await readACL(diagramId);
-  if (existing) return existing;
+  const id = safeId(diagramId);
+  if (!id) throw httpError(400, 'ID de diagrama inválido');
+  const ownerId = normalizeUserId(userId);
 
-  const now = new Date().toISOString();
-  const acl = {
-    diagramId: safeId(diagramId),
-    ownerId: userId || 'anonymous',
-    members: [],
-    createdAt: now,
-    updatedAt: now,
-  };
-  await writeACL(diagramId, acl);
-  return acl;
+  return withTransaction(async (client) => {
+    // Evita que dos primeras conexiones simultáneas creen dos OWNER.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [id]);
+    const { rowCount } = await client.query(
+      'SELECT 1 FROM auth.diagram_acl WHERE diagram_id = $1 LIMIT 1',
+      [id]
+    );
+    if (rowCount === 0) {
+      await client.query(
+        `INSERT INTO auth.diagram_acl (diagram_id, user_id, role)
+         VALUES ($1, $2, 'OWNER')
+         ON CONFLICT (diagram_id, user_id) DO NOTHING`,
+        [id, ownerId]
+      );
+    }
+    return readACLWith(client, id);
+  });
 }
 
 async function getRoleForUser(diagramId, userId) {
-  if (!userId) return 'NONE';
-  const acl = await readACL(diagramId);
-  if (!acl) return 'NONE';
-  if (acl.ownerId === userId) return 'OWNER';
-  const member = (acl.members || []).find(m => m.userId === userId);
-  return member ? member.role : 'NONE';
+  const id = safeId(diagramId);
+  if (!id) return 'NONE';
+  const { rows } = await pool.query(
+    'SELECT role FROM auth.diagram_acl WHERE diagram_id = $1 AND user_id = $2 LIMIT 1',
+    [id, normalizeUserId(userId)]
+  );
+  return rows[0]?.role || 'NONE';
 }
 
 function assertValidRole(role) {
   if (role !== 'EDITOR' && role !== 'VIEWER') {
-    throw new Error('Rol inválido (debe ser EDITOR o VIEWER)');
+    throw httpError(400, 'Rol inválido (debe ser EDITOR o VIEWER)');
   }
 }
 
 async function addMember(diagramId, { userId, role }) {
-  const acl = await readACL(diagramId);
-  if (!acl) throw new Error('Diagrama no encontrado');
+  const id = safeId(diagramId);
+  if (!id) throw httpError(400, 'ID de diagrama inválido');
   assertValidRole(role);
-  if (acl.ownerId === userId) {
-    throw new Error('El owner ya es miembro');
+  const memberId = requireUserId(userId);
+
+  const diagram = await pool.query('SELECT 1 FROM core.diagrams WHERE id = $1 LIMIT 1', [id]);
+  if (diagram.rowCount === 0) throw httpError(404, 'Diagrama no encontrado');
+
+  const existing = await pool.query(
+    'SELECT role FROM auth.diagram_acl WHERE diagram_id = $1 AND user_id = $2 LIMIT 1',
+    [id, memberId]
+  );
+  if (existing.rows[0]?.role === 'OWNER') {
+    throw httpError(400, 'El owner ya es miembro');
   }
-  const existing = acl.members.find(m => m.userId === userId);
-  if (existing) {
-    existing.role = role;
-  } else {
-    acl.members.push({ userId, role, addedAt: new Date().toISOString() });
-  }
-  await writeACL(diagramId, acl);
-  return acl;
+
+  await pool.query(
+    `INSERT INTO auth.diagram_acl (diagram_id, user_id, role)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (diagram_id, user_id) DO UPDATE
+       SET role = EXCLUDED.role`,
+    [id, memberId, role]
+  );
+  return readACL(id);
 }
 
 async function updateMemberRole(diagramId, userId, role) {
@@ -86,22 +152,30 @@ async function updateMemberRole(diagramId, userId, role) {
 }
 
 async function removeMember(diagramId, userId) {
-  const acl = await readACL(diagramId);
-  if (!acl) throw new Error('Diagrama no encontrado');
-  if (acl.ownerId === userId) {
-    throw new Error('No se puede eliminar al owner');
+  const id = safeId(diagramId);
+  if (!id) throw httpError(400, 'ID de diagrama inválido');
+  const memberId = requireUserId(userId);
+
+  const existing = await pool.query(
+    'SELECT role FROM auth.diagram_acl WHERE diagram_id = $1 AND user_id = $2 LIMIT 1',
+    [id, memberId]
+  );
+  if (!existing.rowCount) throw httpError(404, 'Diagrama no encontrado');
+  if (existing.rows[0].role === 'OWNER') {
+    throw httpError(400, 'No se puede eliminar al owner');
   }
-  acl.members = acl.members.filter(m => m.userId !== userId);
-  await writeACL(diagramId, acl);
-  return acl;
+
+  await pool.query(
+    'DELETE FROM auth.diagram_acl WHERE diagram_id = $1 AND user_id = $2',
+    [id, memberId]
+  );
+  return readACL(id);
 }
 
 async function deleteACL(diagramId) {
-  try {
-    await fs.unlink(aclPath(diagramId));
-  } catch {
-    // No existía: nada que borrar
-  }
+  const id = safeId(diagramId);
+  if (!id) return;
+  await pool.query('DELETE FROM auth.diagram_acl WHERE diagram_id = $1', [id]);
 }
 
 module.exports = {

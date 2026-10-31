@@ -4,7 +4,8 @@
   "description": "Servidor de colaboración y API para editor de diagramas",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate-json": "node scripts/migrate-json-to-postgres.js"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +20,7 @@
     "handlebars": "^4.7.9",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
+    "pg": "^8.23.1",
     "ws": "^8.21.3",
     "y-websocket": "^1.4.1",
     "yjs": "^13.6.32"

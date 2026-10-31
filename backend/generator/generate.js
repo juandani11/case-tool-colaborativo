@@ -731,10 +731,13 @@ function buildSqlColumns(mappedAttributes, relations, tableName) {
 // Devuelve Promise<string> con la ruta del ZIP.
 function generateProject(ast) {
   return new Promise((resolve, reject) => {
+    let workDir = null;
     try {
       const projectName = 'generated-backend';
       const outputRoot = path.join(__dirname, 'output');
-      const outputDir = path.join(outputRoot, projectName + '-' + Date.now());
+      fs.mkdirSync(outputRoot, { recursive: true });
+      workDir = fs.mkdtempSync(path.join(outputRoot, 'generated-backend-'));
+      const outputDir = path.join(workDir, 'project');
       fs.mkdirSync(outputDir, { recursive: true });
 
       // ── 0. Sanitizar nombres: el diagrama muestra "Order Details" pero el
@@ -948,17 +951,21 @@ function generateProject(ast) {
       );
 
       // ── 9. ZIP ──
-      const zipPath = path.join(outputRoot, projectName + '.zip');
+      const zipPath = path.join(workDir, projectName + '.zip');
       const output = fs.createWriteStream(zipPath);
       const archive = archiver('zip', { zlib: { level: 9 } });
 
       output.on('close', () => resolve(zipPath));
-      archive.on('error', (err) => reject(err));
+      archive.on('error', (err) => {
+        if (workDir) fs.rmSync(workDir, { recursive: true, force: true });
+        reject(err);
+      });
 
       archive.pipe(output);
       archive.directory(outputDir, false);
       archive.finalize();
     } catch (error) {
+      if (workDir) fs.rmSync(workDir, { recursive: true, force: true });
       reject(error);
     }
   });

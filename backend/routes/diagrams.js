@@ -1,116 +1,108 @@
-// Listado y creación de diagramas para el dashboard (Fase dashboard).
-// GET /api/diagrams -> { owned, shared } (con AUTH_ENABLED=false todo va en owned).
-// POST /api/diagrams { name } -> 201 { id, name } (creador = OWNER).
+'use strict';
+
 const express = require('express');
-const fs = require('fs').promises;
-const path = require('path');
+const diagramService = require('../services/diagramService');
 const aclService = require('../services/aclService');
-const userService = require('../services/userService');
-const { requireAuth } = require('../middleware/auth');
+const chatService = require('../services/chatService');
+const { requireAuth, authEnabled } = require('../middleware/auth');
+const { requireDiagramMember, requireDiagramRole, requireDiagramWrite } = require('../middleware/diagramAuth');
+const { asyncHandler, httpError } = require('../errors');
+const {
+  validateSaveDiagramBody,
+  validateDiagramId,
+  validateDiagramName,
+} = require('../validation');
 
 const router = express.Router();
-const DIAGRAMS_DIR = path.join(__dirname, '..', 'data', 'diagrams');
 
-// Quita todo lo que no sea letra/numero/guion: evita path traversal
-// (un id como "../../secret" quedaria inofensivo). Misma regla que
-// diagramPath() en server.js y aclService: si cambias una, cambia las tres.
-function safeId(diagramId) {
-  return String(diagramId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-}
+router.get('/diagrams', requireAuth, asyncHandler(async (req, res) => {
+  const includeAll = !authEnabled();
+  const diagrams = await diagramService.listVisibleForUser(req.user?.userId, includeAll);
+  const owned = [];
+  const shared = [];
 
-// Lee solo lo necesario para la card del dashboard (nombre + conteos),
-// sin cargar el diagrama entero en memoria. Devuelve null si el archivo
-// esta corrupto para no tumbar todo el listado por un diagrama roto.
-async function readDiagramSummary(file) {
-  try {
-    const content = await fs.readFile(path.join(DIAGRAMS_DIR, file), 'utf-8');
-    const data = JSON.parse(content);
-    const stat = await fs.stat(path.join(DIAGRAMS_DIR, file));
-    return {
-      id: file.replace(/\.json$/, ''),
-      name: data.name || 'Sin nombre',
-      entityCount: Array.isArray(data.nodes) ? data.nodes.length : 0,
-      relationshipCount: Array.isArray(data.edges) ? data.edges.length : 0,
-      updatedAt: stat.mtimeMs,
-    };
-  } catch (err) {
-    console.error(`Error leyendo ${file}:`, err.message);
-    return null;
-  }
-}
-
-router.get('/diagrams', requireAuth, async (req, res) => {
-  try {
-    await fs.mkdir(DIAGRAMS_DIR, { recursive: true });
-    const files = await fs.readdir(DIAGRAMS_DIR);
-    // Los .acl.json son permisos, no diagramas: jamas se listan como cards.
-    const diagramFiles = files.filter(f => f.endsWith('.json') && !f.endsWith('.acl.json'));
-
-    const owned = [];
-    const shared = [];
-
-    // Sin auth: todos como owned (compatibilidad total con el modo abierto)
-    if (process.env.AUTH_ENABLED !== 'true') {
-      for (const file of diagramFiles) {
-        const summary = await readDiagramSummary(file);
-        if (summary) owned.push({ ...summary, role: 'OWNER' });
-      }
-      return res.json({ owned, shared });
+  for (const diagram of diagrams) {
+    if (includeAll || diagram.role === 'OWNER') {
+      owned.push({ ...diagram, role: 'OWNER' });
+    } else {
+      shared.push(diagram);
     }
+  }
 
-    const userId = req.user?.userId;
-    for (const file of diagramFiles) {
-      const diagramId = file.replace(/\.json$/, '');
-      const role = await aclService.getRoleForUser(diagramId, userId);
-      if (role === 'NONE') continue;
-      const summary = await readDiagramSummary(file);
-      if (!summary) continue;
-      if (role === 'OWNER') {
-        owned.push({ ...summary, role });
-      } else {
-        const acl = await aclService.readACL(diagramId);
-        const owner = acl ? await userService.findById(acl.ownerId) : null;
-        shared.push({
-          ...summary,
-          role,
-          ownerUsername: owner?.username || 'desconocido',
-        });
+  res.json({ owned, shared });
+}));
+
+router.post('/diagrams', requireAuth, asyncHandler(async (req, res) => {
+  const checkedName = validateDiagramName(req.body?.name);
+  if (!checkedName.ok) throw httpError(400, checkedName.error);
+
+  const diagramId = `diagram-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const diagram = await diagramService.createDiagramWithOwner({
+    id: diagramId,
+    name: checkedName.value,
+    ownerId: req.user?.userId || 'anonymous',
+  });
+
+  res.status(201).json({ id: diagram.id, name: diagram.name });
+}));
+
+router.get('/diagrams/:id', requireAuth, requireDiagramMember, asyncHandler(async (req, res) => {
+  const diagram = await diagramService.getDiagram(req.params.id);
+  if (!diagram) throw httpError(404, 'Diagrama no encontrado');
+
+  const messages = await chatService.getRecentMessages(req.params.id, 200);
+  res.json({
+    name: diagram.name || `Diagrama ${req.params.id.replace(/^diagram-/, '')}`,
+    nodes: [],
+    edges: [],
+    chat: messages.map(chatService.toWireMessage),
+  });
+}));
+
+router.post('/diagrams/:id', requireAuth, asyncHandler(async (req, res) => {
+  const idCheck = validateDiagramId(req.params.id);
+  if (!idCheck.ok || !idCheck.value) throw httpError(400, 'ID de diagrama inválido');
+
+  const checked = validateSaveDiagramBody(req.body);
+  if (!checked.ok) throw httpError(400, checked.error);
+
+  const { created, diagram } = await diagramService.createDiagramWithOwnerIfAbsent({
+    id: idCheck.value,
+    name: checked.value.name,
+    ownerId: req.user?.userId,
+  });
+
+  if (!created) {
+    if (!diagram) throw httpError(404, 'Diagrama no encontrado');
+    if (authEnabled()) {
+      const role = await aclService.getRoleForUser(idCheck.value, req.user?.userId);
+      if (role !== 'OWNER' && role !== 'EDITOR') {
+        throw httpError(403, 'Sin permiso para guardar este diagrama');
       }
     }
-
-    res.json({ owned, shared });
-  } catch (err) {
-    console.error('Error en GET /api/diagrams:', err);
-    res.status(500).json({ error: err.message });
+    if (checked.value.name && checked.value.name !== diagram.name) {
+      await diagramService.renameDiagram(idCheck.value, checked.value.name);
+    } else {
+      await diagramService.touchDiagram(idCheck.value);
+    }
   }
-});
 
-router.post('/diagrams', requireAuth, async (req, res) => {
-  try {
-    const { name } = req.body || {};
-    const diagramId = `diagram-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const diagram = {
-      name: (typeof name === 'string' && name.trim()) || 'Nuevo diagrama',
-      nodes: [],
-      edges: [],
-      chat: [],
-    };
+  res.json({ ok: true });
+}));
 
-    await fs.mkdir(DIAGRAMS_DIR, { recursive: true });
-    await fs.writeFile(
-      path.join(DIAGRAMS_DIR, `${safeId(diagramId)}.json`),
-      JSON.stringify(diagram, null, 2),
-      'utf-8'
-    );
+router.put('/diagrams/:id/rename', requireAuth, requireDiagramWrite, asyncHandler(async (req, res) => {
+  const checked = validateDiagramName(req.body?.name, '');
+  if (!checked.ok || !checked.value) throw httpError(400, 'name is required');
 
-    // El creador queda como OWNER (anónimo si auth está desactivado)
-    await aclService.getOrCreateACL(diagramId, req.user?.userId || 'anonymous');
+  const updated = await diagramService.renameDiagram(req.params.id, checked.value);
+  if (!updated) throw httpError(404, 'Diagrama no encontrado');
+  res.json({ ok: true, name: updated.name });
+}));
 
-    res.status(201).json({ id: diagramId, name: diagram.name });
-  } catch (err) {
-    console.error('Error en POST /api/diagrams:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
+router.delete('/diagrams/:id', requireAuth, requireDiagramRole('OWNER'), asyncHandler(async (req, res) => {
+  const deleted = await diagramService.deleteDiagram(req.params.id);
+  if (!deleted) throw httpError(404, 'Diagrama no encontrado');
+  res.status(204).send();
+}));
 
 module.exports = router;

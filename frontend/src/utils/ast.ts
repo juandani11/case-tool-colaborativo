@@ -194,6 +194,11 @@ export function nodesToAST(
 export function applyMutations(mutations: any[], hooks: any) {
   // Mapa local para resolver nombres → IDs de nodos recién creados
   const entityNameToId: Record<string, string> = {};
+  // Copia local del `data` de cada nodo tocado en este lote. `hooks.nodes` es
+  // un snapshot: no refleja lo que addNode/updateNode acaban de escribir, así
+  // que sin esto las mutaciones encadenadas (crear entidad + añadir atributo)
+  // se perderían.
+  const nodeDataById: Record<string, any> = {};
 
   // 1. addEntity: crear nodos y poblar el mapa
   for (const mutation of mutations.filter((m: any) => m.action === 'addEntity')) {
@@ -206,16 +211,18 @@ export function applyMutations(mutations: any[], hooks: any) {
       nullable: attr.nullable !== false,
       unique: attr.unique || false,
     }));
+    const data = {
+      label: mutation.entityName,
+      attributes,
+    };
     hooks.addNode({
       id,
       type: 'entity',
       position: { x: Math.random() * 400 + 50, y: Math.random() * 400 + 50 },
-      data: {
-        label: mutation.entityName,
-        attributes,
-      },
+      data,
     });
     entityNameToId[mutation.entityName] = id;
+    nodeDataById[id] = data;
   }
 
   // Helper: resolver nombre de entidad a ID (mapa local → hooks.nodes → null)
@@ -225,6 +232,15 @@ export function applyMutations(mutations: any[], hooks: any) {
     return node ? node.id : null;
   }
 
+  // Helper: data actual del nodo (local del lote → snapshot de hooks.nodes)
+  function resolveNodeData(nodeId: string): any | null {
+    if (nodeDataById[nodeId]) return nodeDataById[nodeId];
+    const node = hooks.nodes.find((n: any) => n.id === nodeId);
+    if (!node) return null;
+    nodeDataById[nodeId] = node.data;
+    return node.data;
+  }
+
   // 2. addAttribute
   for (const mutation of mutations.filter((m: any) => m.action === 'addAttribute')) {
     const nodeId = resolveEntityId(mutation.entityName);
@@ -232,8 +248,8 @@ export function applyMutations(mutations: any[], hooks: any) {
       console.warn(`Entidad no encontrada: ${mutation.entityName}`);
       continue;
     }
-    const node = hooks.nodes.find((n: any) => n.id === nodeId);
-    if (!node) continue;
+    const data = resolveNodeData(nodeId);
+    if (!data) continue;
     const newAttr = {
       id: `attr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       name: mutation.attribute.name,
@@ -242,7 +258,9 @@ export function applyMutations(mutations: any[], hooks: any) {
       nullable: mutation.attribute.nullable !== false,
       unique: mutation.attribute.unique || false,
     };
-    hooks.updateNode(node.id, { data: { ...node.data, attributes: [...node.data.attributes, newAttr] } });
+    const updated = { ...data, attributes: [...(data.attributes || []), newAttr] };
+    nodeDataById[nodeId] = updated;
+    hooks.updateNode(nodeId, { data: updated });
   }
 
   // 3. addRelationship
