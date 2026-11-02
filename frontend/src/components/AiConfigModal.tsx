@@ -11,6 +11,11 @@ interface AiConfigModalProps {
   onClose: () => void;
 }
 
+function isLoopbackOllamaUrl(value: string): boolean {
+  const url = value.trim().toLowerCase();
+  return url.includes('localhost') || url.includes('127.0.0.1') || url.includes('::1');
+}
+
 export default function AiConfigModal({
   aiConfig,
   onAiConfigChange,
@@ -26,6 +31,8 @@ export default function AiConfigModal({
   const isCloudDeployment = typeof window !== 'undefined'
     && process.env.NODE_ENV === 'production'
     && !['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+  const showCloudLocalhostWarning =
+    isCloudDeployment && isLoopbackOllamaUrl(draftOllamaUrl);
 
   const detectModels = async () => {
     const url = draftOllamaUrl.trim() || DEFAULT_AI_CONFIG.ollamaUrl;
@@ -135,7 +142,7 @@ export default function AiConfigModal({
               className="w-full mb-3 px-2.5 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
 
-            {isCloudDeployment && (
+            {showCloudLocalhostWarning && (
               <p
                 className="text-[11px] leading-relaxed text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mb-3"
                 title="En la nube, localhost apunta al servidor de Vercel/Railway, no a tu equipo. Expón Ollama con Ngrok y usa la URL pública."

@@ -197,6 +197,8 @@ Reglas CRÍTICAS:
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+    // LocalTunnel devuelve HTML de advertencia en la primera petición.
+    if (provider.name === 'ollama') headers['Bypass-Tunnel-Reminder'] = 'true';
 
     response = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',

@@ -60,14 +60,17 @@ router.get('/ollama-models', requireAuth, asyncHandler(async (req, res) => {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 7000);
+  const timeout = setTimeout(() => controller.abort(), 60000);
   let lastStatus = null;
   try {
     for (const tagsUrl of targets) {
       console.log('[ollama-models] consultando', tagsUrl);
       const response = await fetch(tagsUrl, {
         signal: controller.signal,
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
       });
       lastStatus = response.status;
       if (!response.ok) {
