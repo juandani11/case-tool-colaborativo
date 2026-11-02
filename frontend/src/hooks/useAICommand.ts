@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { nodesToAST, applyMutations } from '../utils/ast';
 import { apiFetch } from '../lib/apiClient';
-import { EntityNodeData, RelationshipData } from '../types/diagram';
+import { AiProvider, EntityNodeData, RelationshipData, SelectedElementContext } from '../types/diagram';
 import { Node, Edge } from 'reactflow';
 
 // Base del backend (misma que apiClient). Los 3 handlers comparten patron:
@@ -40,6 +40,10 @@ interface AICommandOptions {
   diagramId: string;
   nodes: Node<EntityNodeData>[];
   edges: Edge<RelationshipData>[];
+  selectedElement?: SelectedElementContext | null;
+  provider?: AiProvider;
+  ollamaUrl?: string;
+  ollamaModel?: string;
   addNode: (node: Node<EntityNodeData>) => void;
   updateNode: (id: string, changes: any) => void;
   removeNode: (id: string) => void;
@@ -99,12 +103,17 @@ export function useAICommand(options: AICommandOptions) {
           command: trimmed,
           currentState: ast,
           diagramId: opts.diagramId,
+          selectedElement: opts.selectedElement ?? null,
+          provider: opts.provider ?? undefined,
+          ...(opts.provider === 'ollama' ? { ollamaUrl: opts.ollamaUrl, ollamaModel: opts.ollamaModel } : {}),
         }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        const errorMsg = 'Error: ' + (error.error || 'Error desconocido');
+        const error = await response.json().catch(() => null);
+        const errorMsg = typeof error?.error === 'string'
+          ? error.error
+          : 'No se pudo procesar el comando.';
         opts.addMessage('ia', errorMsg);
         return;
       }

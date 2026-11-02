@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "00_Indice.md",
+                "file": "04_Diseno.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "00_Indice"
+              "title": "04_Diseno"
             }
           }
         ]
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "00_Indice.md",
+                "file": "04_Diseno.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -118,7 +118,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "00_Indice.md",
+                "file": "04_Diseno.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -161,7 +161,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "00_Indice.md",
+                "file": "04_Diseno.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -190,11 +190,16 @@
   },
   "active": "e1c6945bb08dad64",
   "lastOpenFiles": [
-    "04_Diseno.md",
-    "05_Implementacion.md",
+    "10_Anexos.md",
+    "09_Conclusiones.md",
+    "08_Manual_Usuario.md",
+    "07_Despliegue.md",
+    "06_Trazabilidad.md",
+    "01_Arquitectura.md",
+    "00_Indice.md",
     "03_Analisis.md",
     "02_Proceso.md",
-    "01_Arquitectura.md",
-    "00_Indice.md"
+    "04_Diseno.md",
+    "05_Implementacion.md"
   ]
 }

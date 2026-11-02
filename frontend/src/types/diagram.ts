@@ -55,6 +55,8 @@ export interface EntityNodeData {
   lockedBy?: { name: string; color: string; timestamp: number };
 }
 
+export type AiProvider = 'groq' | 'ollama';
+
 // Tipos UML 2.5 que el editor ofrece en la UI (con rombo/triángulo)
 export type UmlRelationshipType =
   | 'ASSOCIATION'
@@ -124,4 +126,21 @@ export interface AstRelationship {
   // true cuando la intermedia proviene de una clase asociativa visible
   // (nodo vinculado por associationClassId) en vez de nombre auto-generado.
   isAssociationClass?: boolean;
+}
+
+// Contexto mínimo que el frontend envía a la IA cuando el alumno tiene un
+// elemento seleccionado. Permite tutoría situada sin enviar coordenadas.
+export interface SelectedElementContext {
+  kind: 'node' | 'edge';
+  id: string;
+  name?: string;
+  stereotype?: 'class' | 'interface';
+  attributes?: Array<Pick<Attribute, 'name' | 'type' | 'isPk' | 'nullable' | 'unique'>>;
+  methods?: Array<Pick<Method, 'name' | 'returnType' | 'parameters' | 'visibility'>>;
+  type?: RelationshipType;
+  label?: string;
+  source?: { id: string; name: string };
+  target?: { id: string; name: string };
+  cardinalityFrom?: string;
+  cardinalityTo?: string;
 }

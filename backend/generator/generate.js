@@ -19,7 +19,7 @@ Handlebars.registerHelper('camelCase', (str) => {
 Handlebars.registerHelper('snakeCase', (str) => {
   if (!str) return '';
   return str
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
     .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
     .toLowerCase();
 });
@@ -330,7 +330,7 @@ function generateConfigJson(entityContexts) {
 function snakeCase(str) {
   if (!str) return '';
   return str
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
     .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
     .toLowerCase();
 }
@@ -355,6 +355,10 @@ function camelCase(str) {
 function splitWords(name) {
   if (!name) return [];
   return name
+    // Transliteración hispana de la ñ antes de quitar diacríticos:
+    // "AñoFiscal" -> "AnioFiscal" -> tabla "anio_fiscal".
+    .replace(/ñ/g, 'ni')
+    .replace(/Ñ/g, 'Ni')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, ' ')
@@ -369,31 +373,49 @@ function capWord(w, lowerRest) {
   return w.charAt(0).toUpperCase() + rest;
 }
 
+const JAVA_KEYWORDS = new Set([
+  'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
+  'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
+  'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
+  'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
+  'package', 'private', 'protected', 'public', 'record', 'return', 'sealed',
+  'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this',
+  'throw', 'throws', 'transient', 'try', 'var', 'void', 'volatile', 'while',
+  'yield', 'true', 'false', 'null', '_',
+]);
+
 // "Order Details" -> "OrderDetails", "USER_ACCOUNT" -> "UserAccount",
-// "producto" -> "Producto", "" -> "Unnamed".
+// "producto" -> "Producto", "" -> "Entidad".
 // Las palabras TODO-MAYÚSCULAS se normalizan ("USER"->"User") pero se
 // conserva la capitalización interna ("OrderDetails" no cambia).
-function toJavaClassName(name) {
+function toJavaClassName(name, fallback = 'Entidad') {
   const words = splitWords(name);
-  if (words.length === 0) return 'Unnamed';
-  return words
-    .map(w => (/^[A-Z0-9_]+$/.test(w) ? capWord(w, true) : capWord(w, false)))
-    .join('');
+  let identifier = words.length === 0
+    ? fallback
+    : words
+      .map(w => (/^[A-Z0-9_]+$/.test(w) ? capWord(w, true) : capWord(w, false)))
+      .join('');
+
+  if (/^[0-9]/.test(identifier)) identifier = `V${identifier}`;
+  if (JAVA_KEYWORDS.has(identifier.toLowerCase())) identifier += 'Entity';
+  return identifier;
 }
 
-function toJavaFieldName(name) {
-  const cls = toJavaClassName(name);
+function toJavaFieldName(name, fallback = 'Atributo') {
+  const cls = toJavaClassName(name, fallback);
   return cls.charAt(0).toLowerCase() + cls.slice(1);
 }
 
-function toSnakeCase(name) {
-  return snakeCase(toJavaClassName(name));
+function toSnakeCase(name, fallback = 'Entidad') {
+  return snakeCase(toJavaClassName(name, fallback));
 }
 
-function toPluralRoute(name) {
-  const snake = toSnakeCase(name);
-  // Plural simple en minúsculas (ver tabla de casos en README).
-  return snake + 's';
+function toPluralRoute(name, fallback = 'Entidad') {
+  const snake = toSnakeCase(name, fallback);
+  if (splitWords(name).length === 0) return 'unnamed';
+  // Evita duplicar la marca de plural cuando el nombre ya termina en s:
+  // "Order Details" -> "order_details", no "order_detailss".
+  return snake.endsWith('s') ? snake : snake + 's';
 }
 
 function isValidJavaIdentifier(name) {
@@ -407,8 +429,9 @@ function isValidJavaIdentifier(name) {
 // Debe correr ANTES de resolver relaciones: todo lo demas usa estos nombres.
 function sanitizeEntities(rawEntities) {
   const taken = new Set();
+  const takenRoutes = new Set();
   return (rawEntities || []).map((raw, idx) => {
-    const base = toJavaClassName(raw.name);
+    const base = toJavaClassName(raw.name, 'Entidad');
     let name = base;
     let n = 2;
     while (taken.has(name)) {
@@ -416,6 +439,16 @@ function sanitizeEntities(rawEntities) {
       n++;
     }
     taken.add(name);
+
+    const baseRoute = toPluralRoute(raw.name);
+    let route = baseRoute;
+    let routeSuffix = 2;
+    while (takenRoutes.has(route)) {
+      route = `${baseRoute}${routeSuffix}`;
+      routeSuffix++;
+    }
+    takenRoutes.add(route);
+
     return {
       ...raw,
       id: raw.id || `entity_${idx}`,
@@ -423,7 +456,7 @@ function sanitizeEntities(rawEntities) {
       originalName: raw.name,
       tableName: snakeCase(name),
       fieldName: camelCase(name),
-      route: snakeCase(name) + 's',
+      route,
       attributes: raw.attributes || [],
     };
   });
@@ -558,7 +591,7 @@ function buildEntityRelations(entity, allEntities, allRelationships) {
     let dtoFkTaken = false;
     if (jpaType === 'manyToOne' || jpaType === 'oneToOne') {
       const attrNames = new Set(
-        (entity.attributes || []).map(a => toJavaFieldName(a.name))
+        (entity.attributes || []).map(a => toJavaFieldName(a.name, 'Atributo'))
       );
       dtoFkTaken = attrNames.has(`${otherNameCamel}Id`);
     }
@@ -779,9 +812,9 @@ function generateProject(ast) {
         let primaryKey;
         if (primaryKeyAttr) {
           primaryKey = {
-            name: toJavaFieldName(primaryKeyAttr.name),
-            namePascal: toJavaClassName(primaryKeyAttr.name),
-            nameCamel: toJavaFieldName(primaryKeyAttr.name),
+            name: toJavaFieldName(primaryKeyAttr.name, 'Atributo'),
+            namePascal: toJavaClassName(primaryKeyAttr.name, 'Atributo'),
+            nameCamel: toJavaFieldName(primaryKeyAttr.name, 'Atributo'),
             javaType: getJavaType(primaryKeyAttr.type),
             sqlType: getSqlType(primaryKeyAttr.type),
             isUuid: primaryKeyAttr.type === 'UUID',
@@ -828,13 +861,13 @@ function generateProject(ast) {
             .map(r => r.fkColumn)
         );
         const mappedAttributes = (entity.attributes || []).map(attr => {
-          const nameSnake = toSnakeCase(attr.name);
+          const nameSnake = toSnakeCase(attr.name, 'Atributo');
           const isFkCollision = !attr.isPk && fkColumns.has(nameSnake);
           return {
-            name: toJavaFieldName(attr.name),
+            name: toJavaFieldName(attr.name, 'Atributo'),
             originalName: attr.name,
-            namePascal: toJavaClassName(attr.name),
-            nameCamel: toJavaFieldName(attr.name),
+            namePascal: toJavaClassName(attr.name, 'Atributo'),
+            nameCamel: toJavaFieldName(attr.name, 'Atributo'),
             nameSnake,
             javaType: getJavaType(attr.type),
             sqlType: getSqlType(attr.type),

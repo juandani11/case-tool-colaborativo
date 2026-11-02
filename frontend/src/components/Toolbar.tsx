@@ -140,44 +140,70 @@ export default function Toolbar({
         </>
       )}
 
-      {/* File Actions */}
+      {/* Export Actions */}
       <ToolGroup>
-        <ToolButton onClick={onExport} tooltip="Exportar JSON">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v7m0 0L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          <span className="hidden lg:inline">JSON</span>
+        <ToolButton onClick={onExport} tooltip="Exportar diagrama a JSON" ariaLabel="Exportar JSON">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 2v7m0 0L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span className="hidden whitespace-nowrap xl:inline">Exportar JSON</span>
         </ToolButton>
-        <ToolButton onClick={onExportXmi} tooltip="Exportar XMI (Enterprise Architect)">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v7m0 0L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          <span className="hidden lg:inline">XMI</span>
+        <ToolButton onClick={onExportXmi} tooltip="Exportar XMI para Enterprise Architect" ariaLabel="Exportar XMI">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 2v7m0 0L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span className="hidden whitespace-nowrap xl:inline">Exportar XMI</span>
         </ToolButton>
+      </ToolGroup>
+
+      <div className="w-px h-5 bg-gray-200 mx-1" />
+
+      {/* Import / Generate Actions */}
+      <ToolGroup>
         {!readOnly && (
           <>
-            <ToolButton onClick={() => fileInputRef.current?.click()} tooltip="Importar JSON">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 9V2m0 7L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          <span className="hidden lg:inline">Importar</span>
-        </ToolButton>
-        <ToolButton onClick={() => xmiInputRef.current?.click()} tooltip="Importar XMI (Enterprise Architect)">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 9V2m0 7L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          <span className="hidden lg:inline">XMI</span>
-        </ToolButton>
-        <ToolButton
-          onClick={() => imageInputRef.current?.click()}
-          tooltip="Generar diagrama desde imagen"
-          disabled={isFromImage}
-        >
-          {isFromImage ? (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="animate-spin">
-              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="16 8" strokeLinecap="round"/>
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="4.5" cy="5" r="1.2" stroke="currentColor" strokeWidth="1"/><path d="M1 9.5l3-2.5 2 1.5 3-3 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          )}
-          <span className="hidden lg:inline">Desde imagen</span>
-        </ToolButton>
-        <ToolButton onClick={onGenerateBackend} tooltip="Generar backend" variant="primary">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3L2 7l3 4M9 3l3 4-3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          <span className="hidden lg:inline">Generar</span>
-        </ToolButton>
+            <ToolButton onClick={() => fileInputRef.current?.click()} tooltip="Importar diagrama desde JSON" ariaLabel="Importar JSON">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 9V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span className="hidden whitespace-nowrap xl:inline">Importar JSON</span>
+            </ToolButton>
+            <ToolButton onClick={() => xmiInputRef.current?.click()} tooltip="Importar XMI desde Enterprise Architect" ariaLabel="Importar XMI">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 9V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span className="hidden whitespace-nowrap xl:inline">Importar XMI</span>
+            </ToolButton>
+            <ToolButton
+              onClick={() => imageInputRef.current?.click()}
+              tooltip="Generar diagrama desde imagen"
+              ariaLabel="Generar desde imagen"
+              disabled={isFromImage}
+            >
+              {isFromImage ? (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="animate-spin">
+                  <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="16 8" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="4.5" cy="5" r="1.2" stroke="currentColor" strokeWidth="1" />
+                  <path d="M1 9.5l3-2.5 2 1.5 3-3 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              <span className="hidden whitespace-nowrap lg:inline">Desde imagen</span>
+            </ToolButton>
+            <ToolButton onClick={onGenerateBackend} tooltip="Generar backend Spring Boot" ariaLabel="Generar backend" variant="primary">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="4" y="4" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M5.5 1v2M8.5 1v2M5.5 11v2M8.5 11v2M1 5.5h2M1 8.5h2M11 5.5h2M11 8.5h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              <span className="hidden whitespace-nowrap lg:inline">Generar</span>
+            </ToolButton>
           </>
         )}
         <input
@@ -276,6 +302,7 @@ function ToolButton({
   onClick,
   children,
   tooltip,
+  ariaLabel,
   active,
   variant,
   disabled,
@@ -283,14 +310,17 @@ function ToolButton({
   onClick: () => void;
   children: React.ReactNode;
   tooltip?: string;
+  ariaLabel?: string;
   active?: boolean;
   variant?: 'default' | 'primary';
   disabled?: boolean;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={tooltip}
+      aria-label={ariaLabel || tooltip}
       disabled={disabled}
       className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all duration-150 ${
         disabled

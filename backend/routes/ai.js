@@ -21,15 +21,77 @@ const {
   validateCommandPayload,
   validateAstState,
   validateMutations,
+  validateOllamaUrl,
 } = require('../validation');
 
 const router = express.Router();
+
+router.get('/ollama-models', requireAuth, asyncHandler(async (req, res) => {
+  const fallbackUrl = process.env.OLLAMA_URL || 'http://localhost:11434/v1';
+  const checkedUrl = validateOllamaUrl(req.query.url || fallbackUrl);
+  if (!checkedUrl.ok) throw httpError(400, checkedUrl.error);
+
+  let parsed;
+  try {
+    parsed = new URL(checkedUrl.value);
+  } catch {
+    throw httpError(400, 'ollamaUrl debe ser una URL http(s) válida');
+  }
+
+  // Ollama sirve /api/tags en la raíz; /v1 solo aplica a su API OpenAI-compatible.
+  const basePath = parsed.pathname.replace(/\/+$/, '').replace(/\/v1$/i, '');
+  const baseUrl = `${parsed.protocol}//${parsed.host}${basePath}`;
+  const targets = [`${baseUrl}/api/tags`];
+
+  // En Windows, "localhost" puede resolver a ::1 mientras Ollama escucha en 127.0.0.1.
+  if (parsed.hostname === 'localhost') {
+    targets.push(`${parsed.protocol}//127.0.0.1${parsed.port ? `:${parsed.port}` : ''}${basePath}/api/tags`);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+  let lastStatus = null;
+  try {
+    for (const tagsUrl of targets) {
+      console.log('[ollama-models] consultando', tagsUrl);
+      const response = await fetch(tagsUrl, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+      lastStatus = response.status;
+      if (!response.ok) {
+        console.error(`[ollama-models] ${tagsUrl} respondió ${response.status}`);
+        continue;
+      }
+      const data = await response.json().catch(() => null);
+      const names = Array.isArray(data?.models)
+        ? data.models
+          .map((model) => (model && typeof model.name === 'string' ? model.name.trim() : ''))
+          .filter(Boolean)
+        : [];
+      return res.json([...new Set(names)].sort());
+    }
+    throw httpError(
+      503,
+      `Error de conexión o CORS con Ollama${lastStatus ? ` (HTTP ${lastStatus})` : ''}. Verifica que esté encendido y accesible.`
+    );
+  } catch (error) {
+    if (error.status) throw error;
+    console.error('[ollama-models] error de conexión:', error.message);
+    throw httpError(
+      503,
+      'Error de conexión o CORS con Ollama. Verifica que esté encendido y accesible.'
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}));
 
 router.post('/command', requireAuth, asyncHandler(async (req, res) => {
   const checked = validateCommandPayload(req.body);
   if (!checked.ok) throw httpError(400, checked.error);
 
-  const { command, currentState, diagramId } = checked.value;
+  const { command, currentState, diagramId, selectedElement, provider, ollamaUrl, ollamaModel } = checked.value;
   const username = aiUsername(req.user);
   let historyPrompt = '';
 
@@ -65,7 +127,9 @@ router.post('/command', requireAuth, asyncHandler(async (req, res) => {
     null,
     null,
     username,
-    historyPrompt
+    historyPrompt,
+    selectedElement,
+    { provider, ollamaUrl, ollamaModel }
   );
   const checkedMutations = validateMutations(mutations);
   if (!checkedMutations.ok) throw httpError(502, 'La IA devolvió un formato inválido');

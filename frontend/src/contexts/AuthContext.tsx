@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { apiFetch, getToken, setToken, clearToken, API_BASE } from '../lib/apiClient';
 
 // Sesion global: user, si el backend exige auth, login/register/logout.
@@ -95,10 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user);
   }
 
-  function logout() {
+  const logout = useCallback(() => {
     clearToken();
     setUser(null);
-  }
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, authEnabled, login, register, logout }}>

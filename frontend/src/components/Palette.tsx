@@ -20,7 +20,7 @@ const ITEMS: PaletteItem[] = [
     id: 'class',
     label: 'Clase',
     icon: '\u25A1',
-    description: 'Clase UML estandar',
+    description: 'Clase UML estándar',
     defaultData: { label: 'NuevaClase', attributes: [], methods: [], stereotype: 'class' },
   },
   {
@@ -56,18 +56,25 @@ export interface RelationshipOption {
 }
 
 export const RELATIONSHIPS: RelationshipOption[] = [
-  { id: 'association', label: 'Asociacion', icon: '\u2500\u2500\u2500', description: 'Relacion simple', edgeType: 'association', relationshipType: 'ASSOCIATION' },
-  { id: 'inheritance', label: 'Herencia', icon: '\u2500\u2500\u25B7', description: 'Generalizacion', edgeType: 'inheritance', relationshipType: 'INHERITANCE' },
-  { id: 'composition', label: 'Composicion', icon: '\u2500\u2500\u25C6', description: 'Composicion (rombo lleno)', edgeType: 'composition', relationshipType: 'COMPOSITION' },
-  { id: 'aggregation', label: 'Agregacion', icon: '\u2500\u2500\u25C7', description: 'Agregacion (rombo vacio)', edgeType: 'aggregation', relationshipType: 'AGGREGATION' },
+  { id: 'association', label: 'Asociación', icon: '\u2500\u2500\u2500', description: 'Relación simple', edgeType: 'association', relationshipType: 'ASSOCIATION' },
+  { id: 'inheritance', label: 'Herencia', icon: '\u2500\u2500\u25B7', description: 'Generalización', edgeType: 'inheritance', relationshipType: 'INHERITANCE' },
+  { id: 'composition', label: 'Composición', icon: '\u2500\u2500\u25C6', description: 'Composición (rombo lleno)', edgeType: 'composition', relationshipType: 'COMPOSITION' },
+  { id: 'aggregation', label: 'Agregación', icon: '\u2500\u2500\u25C7', description: 'Agregación (rombo vacío)', edgeType: 'aggregation', relationshipType: 'AGGREGATION' },
 ];
 
 interface PaletteProps {
   activeRelationType: string | null;
   onSelectRelationType: (type: string | null) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export default function Palette({ activeRelationType, onSelectRelationType }: PaletteProps) {
+export default function Palette({
+  activeRelationType,
+  onSelectRelationType,
+  collapsed,
+  onToggleCollapse,
+}: PaletteProps) {
   function handleDragStart(e: React.DragEvent, item: PaletteItem) {
     e.dataTransfer.setData(
       'application/reactflow',
@@ -76,48 +83,69 @@ export default function Palette({ activeRelationType, onSelectRelationType }: Pa
     e.dataTransfer.effectAllowed = 'move';
   }
 
+  if (collapsed) return null;
+
   return (
     <aside className="w-52 bg-white border-r border-gray-200 p-3 overflow-y-auto flex-shrink-0">
-      {/* Elementos */}
-      <h3 className="text-xs uppercase font-semibold text-gray-500 mb-3">
-        Elementos
-      </h3>
-      <div className="space-y-1 mb-6">
-        {ITEMS.map((item) => (
-          <div
-            key={item.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, item)}
-            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 cursor-grab active:cursor-grabbing text-sm"
-            title={item.description}
-          >
-            <span className="text-lg w-5 text-center">{item.icon}</span>
-            <span>{item.label}</span>
-          </div>
-        ))}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs uppercase font-semibold text-gray-500">Paleta</span>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+          title="Ocultar paleta"
+          aria-label="Ocultar paleta"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M9 4l-4 4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
 
-      {/* Relaciones */}
-      <h3 className="text-xs uppercase font-semibold text-gray-500 mb-3">
-        Relaciones
-      </h3>
-      <div className="space-y-1">
-        {RELATIONSHIPS.map((rel) => (
-          <div
-            key={rel.id}
-            onClick={() => onSelectRelationType(activeRelationType === rel.id ? null : rel.id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer text-sm transition-colors ${
-              activeRelationType === rel.id
-                ? 'bg-blue-100 text-blue-700 font-medium'
-                : 'hover:bg-gray-100 text-gray-700'
-            }`}
-            title={rel.description}
-          >
-            <span className="text-lg w-5 text-center font-mono">{rel.icon}</span>
-            <span>{rel.label}</span>
-          </div>
-        ))}
-      </div>
+      <section className="border-b border-gray-200 pb-3 mb-3">
+        <h3 className="text-xs uppercase font-semibold text-gray-500 mb-2">
+          Elementos
+        </h3>
+        <div className="space-y-1">
+          {ITEMS.map((item) => (
+            <div
+              key={item.id}
+              draggable
+              onDragStart={(e) => handleDragStart(e, item)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded hover:bg-gray-100 cursor-grab active:cursor-grabbing text-sm"
+              title={item.description}
+            >
+              <span className="w-6 flex-shrink-0 text-center text-lg leading-none">{item.icon}</span>
+              <span className="min-w-0 truncate">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-xs uppercase font-semibold text-gray-500 mb-2">
+          Relaciones
+        </h3>
+        <div className="space-y-1">
+          {RELATIONSHIPS.map((rel) => (
+            <button
+              key={rel.id}
+              type="button"
+              onClick={() => onSelectRelationType(activeRelationType === rel.id ? null : rel.id)}
+              aria-pressed={activeRelationType === rel.id}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded text-left text-sm transition-colors ${
+                activeRelationType === rel.id
+                  ? 'bg-blue-100 text-blue-700 font-medium'
+                  : 'hover:bg-gray-100 text-gray-700'
+              }`}
+              title={rel.description}
+            >
+              <span className="w-6 flex-shrink-0 text-center font-mono text-base leading-none">{rel.icon}</span>
+              <span className="min-w-0 truncate">{rel.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
     </aside>
   );
 }

@@ -48,6 +48,20 @@ export interface ConnectedUser {
   color: string;
 }
 
+interface ImportedNode {
+  id: string;
+  position: { x: number; y: number };
+  data: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface ImportedEdge {
+  id: string;
+  source: string;
+  target: string;
+  [key: string]: unknown;
+}
+
 function teardown(
   provider: WebsocketProvider | null,
   doc: Y.Doc | null
@@ -361,17 +375,57 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     const reader = new FileReader();
     reader.onload = (e: any) => {
       try {
-        const data = JSON.parse(e.target.result);
-        if (!data.nodes || !data.edges) {
-          alert('Formato JSON invalido');
+        const data = JSON.parse(e.target.result) as { nodes: unknown; edges: unknown };
+        if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
+          alert('Formato JSON inválido: se esperaban arreglos nodes y edges.');
           return;
         }
-        // Clear and repopulate in a single Yjs transaction
+        const importedNodes = data.nodes as ImportedNode[];
+        const importedEdges = data.edges as ImportedEdge[];
+
+        const nodeIds = new Set<string>();
+        const nodesAreValid = importedNodes.every((node: ImportedNode) => {
+          const valid = node
+            && typeof node.id === 'string'
+            && node.id.length > 0
+            && node.position
+            && typeof node.position.x === 'number'
+            && typeof node.position.y === 'number'
+            && node.data
+            && typeof node.data === 'object'
+            && !nodeIds.has(node.id);
+          if (valid) nodeIds.add(node.id);
+          return valid;
+        });
+        if (!nodesAreValid) {
+          alert('JSON inválido: hay nodos sin id, posición o datos, o ids duplicados.');
+          return;
+        }
+
+        const edgeIds = new Set<string>();
+        const edgesAreValid = importedEdges.every((edge: ImportedEdge) => {
+          const valid = edge
+            && typeof edge.id === 'string'
+            && edge.id.length > 0
+            && !edgeIds.has(edge.id)
+            && typeof edge.source === 'string'
+            && typeof edge.target === 'string'
+            && nodeIds.has(edge.source)
+            && nodeIds.has(edge.target);
+          if (valid) edgeIds.add(edge.id);
+          return valid;
+        });
+        if (!edgesAreValid) {
+          alert('JSON inválido: hay aristas sin id o con extremos inexistentes.');
+          return;
+        }
+
+        // Clear and repopulate in a single Yjs transaction only after validation.
         docTransact(ydocRef.current, () => {
           yn.clear();
           ye.clear();
-          data.nodes.forEach((node: any) => yAddNode(yn, node));
-          data.edges.forEach((edge: any) => yAddEdge(ye, edge));
+          importedNodes.forEach((node) => yAddNode(yn, node));
+          importedEdges.forEach((edge) => yAddEdge(ye, edge));
         });
       } catch (error) {
         alert('Error al importar: ' + (error as Error).message);

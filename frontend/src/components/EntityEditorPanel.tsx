@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, memo } from 'react';
-import { EntityNodeData, Attribute, Method, MethodParameter } from '../types/diagram';
+import { EntityNodeData, Attribute, Method } from '../types/diagram';
 
 // Panel lateral de edicion de la entidad seleccionada (nombre, atributos con
 // PK/nullable/unique, metodos). Edita una COPIA local y guarda con onSave ->
@@ -25,20 +25,8 @@ interface EntityEditorPanelProps {
   onClose: () => void;
   associationInfo?: AssociationInfo | null;
   onDissolveAssociation?: () => void;
+  duplicateName?: boolean;
 }
-
-const initialMethod: Method = {
-  id: '',
-  name: 'nuevoMetodo',
-  returnType: 'void',
-  parameters: [],
-  visibility: 'public',
-};
-
-const initialParameter: MethodParameter = {
-  name: 'param',
-  type: 'String',
-};
 
 const EntityEditorPanel = memo(function EntityEditorPanel({
   nodeId,
@@ -47,6 +35,7 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
   onClose,
   associationInfo,
   onDissolveAssociation,
+  duplicateName,
 }: EntityEditorPanelProps) {
   const [label, setLabel] = useState(initialData.label);
   const [attributes, setAttributes] = useState<Attribute[]>(initialData.attributes || []);
@@ -60,8 +49,12 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
     setStereotype(initialData.stereotype || 'class');
   }, [nodeId, initialData.label, initialData.attributes, initialData.methods, initialData.stereotype]);
 
+  const defaultLabel = stereotype === 'interface' ? 'NuevaInterfaz' : 'NuevaClase';
+
   const handleSave = () => {
-    onSave(nodeId, { label, attributes, methods, stereotype });
+    const normalizedLabel = (label || "").trim() || defaultLabel;
+    if (normalizedLabel !== label) setLabel(normalizedLabel);
+    onSave(nodeId, { label: normalizedLabel, attributes, methods, stereotype });
   };
 
   const handleAddAttribute = () => {
@@ -169,11 +162,22 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Nombre</label>
           <input
             type="text"
-            value={label}
+            value={label || ""}
             onChange={(e) => setLabel(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           />
+          {!(label || "").trim() && (
+            <p className="text-[11px] text-gray-400 mt-1">
+              Si se deja vacío se guardará como “{defaultLabel}”.
+            </p>
+          )}
+          {duplicateName && (label || "").trim() && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mt-1.5">
+              Ya existe otra entidad con este nombre. Se permitirá porque React Flow las distingue por ID,
+              pero conviene renombrarla para evitar ambigüedad en la IA y en el generador.
+            </p>
+          )}
         </div>
 
         {/* Stereotype */}

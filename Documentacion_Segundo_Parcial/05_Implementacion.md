@@ -45,7 +45,7 @@ case-tool/
 └── Documentacion_Segundo_Parcial/  Este vault
 ```
 
-## 3. Las cuatro capas internas del backend
+## 3. Capas internas del backend
 
 ### 3.1 Capa 1: transporte
 
@@ -470,6 +470,115 @@ Responsabilidades:
 - `useCollaborativeFlow` ya no expone `getSnapshot`.
 - Se eliminó `frontend/src/lib/chatHistory.ts` por quedar obsoleto.
 
+### 9.6 Refactorización P0 y P1
+
+La implementación se estabilizó en dos bloques de refactorización. El bloque P0 eliminó riesgos de seguridad, concurrencia y consistencia; el bloque P1 mejoró la mantenibilidad sin alterar los contratos de la API.
+
+| Bloque | Cambio | Archivos | Resultado |
+|---|---|---|---|
+| P0 | ACL de solo lectura; sin auto-claim | `middleware/diagramAuth.js`, `realtime/yjs.js` | Un diagrama existente sin ACL se rechaza |
+| P0 | Diagrama + ACL atómicos | `services/diagramService.js`, `routes/diagrams.js` | No quedan diagramas huérfanos |
+| P0 | Snapshot antes de aceptar clientes | `realtime/yjs.js` | `ws.pause()` + `readyPromise` + `setupWSConnection()` |
+| P0 | Validación runtime de IA, AST y ACL | `validation.js`, `services/aclService.js` | Mutaciones inválidas no se aplican |
+| P0 | Generación concurrente aislada | `generator/generate.js` | ZIP temporal único por petición |
+| P0 | Cierre ordenado | `server.js`, `realtime/yjs.js` | Flush de snapshots y cierre de pool |
+| P1 | `server.js` como bootstrap | `server.js` (59 líneas) | Baja cohesión eliminada del punto de entrada |
+| P1 | `app.js` + `realtime/yjs.js` | `app.js`, `realtime/yjs.js` | Express y WebSocket se componen por separado |
+| P1 | Errores centralizados | `errors.js`, `middleware/errorHandler.js` | `AppError`, `asyncHandler`, 404 y 500 uniformes |
+| P1 | Hooks de React | `useDiagramMembers.ts`; `ChatPanel`, `Toolbar` | Componentes de presentación sin API propia |
+
+**Métricas de la refactorización:** `server.js` pasó de 884 a 59 líneas; el backend quedó con 22 archivos verificables con `node --check`; el lint del frontend bajó de 154 a 150 problemas preexistentes.
+
+### 9.7 Trazabilidad de las iteraciones PUDS
+
+| Iteración PUDS | Objetivo | Implementación verificable | Evidencia de cierre |
+|---|---|---|---|
+| Iteración 1 — Inicio | Identidad no suplantable | `requireAuth`, `aiUsername`, prompt con `username` del JWT | Respuestas dirigidas al usuario autenticado |
+| Iteración 2 — Elaboración | Separar teoría de acción | Prompt de clasificación, `{response, mutations}`, `validateMutations` | Consulta teórica sin mutaciones; acción validada |
+| Iteración 3 — Construcción | Evitar pérdida de snapshots y ACL huérfanas | `ws.pause()`, `readyPromise`, `createDiagramWithOwner`, validación | Sin escrituras antes del snapshot; transacciones atómicas |
+| Iteración 4 — Transición | Resolver referencias conversacionales | `getRecentMessages(...,15)`, `formatChatHistory`, emisión Yjs | “bórralo” resuelve el turno anterior; chat visible para A y B |
+
+### 9.8 Mecanismos de aprendizaje (Requisito C)
+
+**Agente Tutor.** `aiService` actúa como tutor y moderador: clasifica la intención, responde consultas teóricas con lenguaje didáctico, conserva la identidad del usuario y usa el historial público como contexto. Cuando la intención es una acción, devuelve mutaciones ordenadas y validadas; cuando es teoría o ambigüedad, no modifica el diagrama.
+
+> **Agente Tutor con Conciencia Contextual (Context-Aware Tutoring)**
+>
+> Para potenciar el mecanismo de aprendizaje, el Agente IA no solo responde consultas teóricas generales, sino que implementa una **Tutoría Contextual**.
+>
+> 1. **Lectura del Foco de Atención:** el frontend captura el elemento del diagrama (clase, atributo o relación) que el usuario tiene seleccionado y lo envía junto con la consulta en el campo `selectedElement`.
+> 2. **Respuestas Basadas en el Modelo del Alumno:** el *system prompt* del LLM inyecta este elemento seleccionado. Si el usuario pregunta *"¿Qué es una relación de agregación?"* mientras tiene seleccionada una relación específica, la IA responde: *"La relación que has seleccionado entre [Entidad A] y [Entidad B] es de agregación porque..."*.
+> 3. **Aprendizaje Situado:** esta técnica pedagógica (aprendizaje basado en el contexto) permite que el usuario comprenda los conceptos abstractos de UML 2.5 aplicados directamente a su propio diseño, facilitando la asimilación y corrección de errores en tiempo real.
+>
+> **Implementación:** `useAICommand.ts` construye `SelectedElementContext` desde el nodo o arista seleccionada; `validation.js` valida y acota la metadata; `routes/ai.js` la propaga a `aiService.getMutationsFromAI`; el prompt incluye la sección **FOCO DE ATENCIÓN DEL USUARIO** con reglas de tutoría contextual.
+
+**Manual de usuario embebido.** `HelpModal` y `data/manual.ts` ofrecen ayuda contextual sin abandonar el editor. Se abre con el botón Ayuda o `F1`, permite navegar secciones y se cierra con `Escape` o clic fuera. El contenido se mantiene alineado con las funciones reales.
+
+**Feedback visual UI/UX.**
+
+- `isProcessing`, `isRecording` e `isFromImage` comunican el estado del asistente y deshabilitan acciones incompatibles.
+- Los mensajes `system` informan transcripción, errores y pasos intermedios.
+- El modo `VIEWER` deshabilita comandos y edición, con un aviso explícito.
+- `PresencePanel` y el soft-lock muestran quién está conectado y qué nodo está editando cada usuario.
+- El estado de conexión y los errores de API se presentan en la interfaz, evitando fallos silenciosos.
+
+### 9.9 Diagrama de Paquetes (estructura de carpetas)
+
+El diagrama evidencia la modularidad del repositorio: frontend, backend y bóveda documental son paquetes independientes con dependencias explícitas.
+
+```mermaid
+flowchart TB
+    ROOT["case-tool"]
+
+    subgraph FRONTEND["frontend/src"]
+        APP["app/<br/>páginas y rutas"]
+        COMP["components/<br/>UI y paneles"]
+        HOOKS["hooks/<br/>colaboración · IA · miembros"]
+        CTX["contexts/<br/>AuthContext"]
+        LIB["lib/<br/>apiClient · presencia"]
+        TYPES["types/<br/>contratos TS"]
+    end
+
+    subgraph BACKEND["backend"]
+        SERVER["server.js<br/>bootstrap"]
+        APPJS["app.js<br/>composición Express"]
+        ROUTES["routes/<br/>auth · diagrams · acl · ai"]
+        MW["middleware/<br/>auth · ACL · errores · upload"]
+        SVC["services/<br/>user · acl · diagram · chat · ai"]
+        RT["realtime/<br/>yjs.js"]
+        DB["db.js<br/>pool y transacciones"]
+        GEN["generator/<br/>Spring Boot + ZIP"]
+        VAL["validation.js + errors.js"]
+    end
+
+    subgraph VAULT["vault_obsidian / Documentacion_Segundo_Parcial"]
+        DOC01["01_Arquitectura"]
+        DOC02["02_Proceso"]
+        DOC03["03_Analisis"]
+        DOC04["04_Diseno"]
+        DOC05["05_Implementacion"]
+    end
+
+    ROOT --> APP
+    ROOT --> SERVER
+    ROOT --> DOC01
+    APP --> COMP
+    APP --> HOOKS
+    APP --> CTX
+    HOOKS --> LIB
+    COMP --> TYPES
+    SERVER --> APPJS
+    APPJS --> ROUTES
+    ROUTES --> MW
+    MW --> SVC
+    SVC --> DB
+    RT --> SVC
+    SVC --> GEN
+    SVC --> VAL
+```
+
+**Lectura de modularidad:** `frontend/src/app` compone páginas; `components` contiene presentación; `hooks` concentra estado y casos de uso; `backend/routes` actúa como transporte; `services` contiene dominio; `middleware` aplica políticas transversales; `realtime` encapsula Yjs. La bóveda es un paquete documental independiente del código ejecutable.
+
 ## 10. Migración de datos legacy
 
 El script `backend/scripts/migrate-json-to-postgres.js` se ejecuta con:
@@ -495,7 +604,9 @@ Resultado de la ejecución:
 - Verificación posterior: 3 usuarios, 13 ACL, 11 diagramas y 0 mensajes tras limpiar datos de prueba.
 - El usuario adicional es el usuario técnico anónimo.
 
-## 11. Pruebas y verificación
+## 11. Verificación y Validación (V&V)
+
+La estrategia distingue **validación** (¿se construyó el producto correcto?) de **verificación** (¿se construyó correctamente?). La validación se apoya en escenarios de uso reales; la verificación, en compilación, auditoría estática y pruebas de regresión.
 
 ### 11.1 Pruebas de integración PostgreSQL
 
@@ -547,11 +658,191 @@ Se comprobó:
 - `server.js` quedó en 59 líneas, solo con bootstrap.
 - No se modificaron los contratos de API ni el formato de las mutaciones.
 
-### 11.5 Pruebas legacy
+### 11.5 Validación manual y regresión del chat IA
+
+**Validación con dos usuarios en tiempo real:**
+
+1. El Usuario A inicia sesión y abre un diagrama.
+2. El Usuario B inicia sesión, recibe la invitación y abre el mismo diagrama.
+3. A crea una entidad; B observa el nodo sin recargar.
+4. B mueve el nodo; A recibe la nueva posición y el soft-lock.
+5. A envía “crea la entidad Pedido”.
+6. B observa el mensaje del usuario, la respuesta del asistente y la mutación aplicada.
+7. A envía “agrégale total”; el backend recupera el historial y resuelve el pronombre.
+8. Ambos recargan la página y verifican que el grafo y el chat persisten.
+
+**Validación de memoria contextual:**
+
+- El historial se consulta por `diagram_id`; no se mezcla entre salas.
+- El límite de 15 mensajes mantiene el contexto acotado.
+- La respuesta de la IA se persiste en `chat.messages` y se emite por `Y.Array('chat')`.
+- El cliente no duplica la respuesta cuando `chatEmitted=true`.
+
+**Regresión del chat IA:** se ejecutó la suite de regresión del asistente con **32/32 verificaciones aprobadas**, cubriendo identidad, clasificación, consultas teóricas, mutaciones válidas, mutaciones rechazadas, memoria, emisión colaborativa y errores del proveedor.
+
+### 11.6 Auditoría de seguridad y transacciones
+
+| Control | Verificación | Resultado |
+|---|---|---|
+| ACL sin efectos secundarios | GET y WS no crean filas ACL | Correcto |
+| Creación atómica | Diagrama + ACL en una transacción | Correcto |
+| Borrado atómico | ACL + diagrama en una transacción | Correcto |
+| Token WS | Token inválido cierra con `4401` | Correcto |
+| Rol insuficiente | Cierre `4403` o HTTP `403` | Correcto |
+| Diagrama inexistente | Cierre `4404` o HTTP `404` | Correcto |
+| UUID de miembro | UUID inválido rechazado, no convertido a anónimo | Correcto |
+| Mutaciones IA | Allowlist y validación antes de aplicar | Correcto |
+| Errores internos | `500` genérico sin mensajes de PostgreSQL/Groq | Correcto |
+
+### 11.7 Pruebas legacy
 
 Los archivos `backend/tests/*.js` basados en persistencia de archivos quedaron obsoletos. No deben ejecutarse como validación del backend actual porque esperan archivos JSON y un modelo anterior.
 
 Las pruebas del generador en `backend/generator/tests/` siguen siendo útiles para las reglas de transformación y el routing visual.
+
+### 11.8 Resultado de la auditoría QA de robustez y UX
+
+La auditoría final cubrió el Agente Tutor y el editor UML. El reporte completo se conserva en `AUDIT_QA.md`; los resultados principales son:
+
+| Área | Resultado |
+|---|---|
+| Tutoría sin selección | PASS: responde de forma general |
+| Referencias al elemento seleccionado | PASS: `selectedElement` se valida y se inyecta en el prompt |
+| Ambigüedad | PASS: pide aclaración y no inventa mutaciones |
+| Preguntas fuera de contexto | PASS: redirige al diseño UML |
+| Nombre vacío | PASS: se normaliza a `NuevaClase` o `NuevaInterfaz` |
+| Nombres duplicados | PASS: se advierte y se conserva la identidad por ID |
+| Self-loop por clic y por arrastre | PASS: ambos generan `selfloop` |
+| Borrado de nodo con relaciones | PASS: elimina aristas incidentes |
+| Posiciones tras recarga | PASS: `position.x` y `position.y` se conservan en Yjs |
+| Build y typecheck | PASS |
+| ESLint | 148 problemas preexistentes; sin regresiones nuevas |
+
+**Correcciones aplicadas:** reglas de foco contextual y explicación didáctica en `aiService.js`, validación de `selectedElement` en `validation.js`, self-loop por arrastre en `page.tsx`, normalización de nombres y advertencia de duplicados en `EntityEditorPanel`, y fallback visual en `EntityNode`.
+
+### 11.9 Auditoría QA Integral
+
+La auditoría integral cubrió autenticación, ACL, colaboración Yjs, generación Spring Boot e importación/exportación. El reporte completo se conserva en `AUDIT_QA_FULL.md`.
+
+| Módulo | Evidencia | Estado |
+|---|---|---|
+| Autenticación | Email duplicado `400`, campos vacíos `400`, contraseña débil `400`, `/me` sin token `401` | PASS |
+| JWT | Token solo contiene `userId` y `username`; `/me` no expone `password_hash` | PASS |
+| ACL | EDITOR no puede borrar (`403`), usuario ajeno recibe `403`, WS cierra `4403` | PASS |
+| Integridad de borrado | Diagrama temporal: antes `OWNER`; después `diagram=false`, `role=NONE` | PASS |
+| Colaboración Yjs | Ediciones concurrentes convergen en JSON válido; snapshot y posiciones se conservan | PASS |
+| WebSocket | Carga de snapshot antes de `setupWSConnection`; reconexión por `y-websocket` | PASS por diseño |
+| Generador | AST vacío rechazado; ZIP con `pom.xml`, properties y 4 capas; N:M genera tabla intermedia | PASS |
+| Importación JSON | Validación antes de limpiar Yjs; rechaza nodos/aristas malformados e IDs duplicados | PASS (corregido) |
+| Exportación XMI | IDs XMI basados en `node.id` y `edge.id`, sin colisión por nombres duplicados | PASS (corregido) |
+| Importación XMI inválida | `parsererror` con alerta y rechazo capturado en la página | PASS |
+
+**Correcciones:** validación previa de JSON en `useCollaborativeFlow`, IDs XMI estables en `xmiExporter`, captura de errores de importación XMI en `page.tsx`, y refuerzo del prompt de tutoría y la validación de `selectedElement`.
+
+### 11.10 Auditoría Maestra del Agente IA
+
+El System Prompt de `aiService.js` se amplió con un **Perfil de Arquitectura del Proyecto** y reglas de tono adaptativo, cero alucinaciones, contexto y seguridad. El agente ahora puede explicar:
+
+- Frontend: Next.js, React Flow y Yjs/CRDT.
+- Backend: Node.js + Express con Clean Architecture pragmática.
+- Datos: PostgreSQL en Neon con esquemas `auth`, `core` y `chat`.
+- Generación: Handlebars → backend Spring Boot.
+- Despliegue: Vercel + Railway + Neon.
+
+Se auditaron **15 escenarios** agrupados en preguntas técnicas, negocio, tutoría contextual, consultas maliciosas y contexto operativo. Todos los escenarios de tutoría mantienen `mutations: []`; las acciones siguen pasando por validación. La matriz completa, las respuestas simuladas y los riesgos residuales están en `AUDIT_AI_MASTER.md`.
+
+**Resultado:** PASS en claridad, precisión, tono adaptativo, uso del elemento seleccionado y rechazo de solicitudes maliciosas.
+
+### 11.11 Validación de Seguridad y Manejo de Errores (QA)
+
+La etapa final consolidó controles defensivos y estados de interfaz verificables:
+
+| Área | Control implementado | Evidencia |
+|---|---|---|
+| SSRF en Ollama | `validateOllamaUrl` exige `http://` o `https://`, URL parseable, host, longitud máxima y sin credenciales embebidas | `backend/validation.js` |
+| Aislamiento por petición | La URL/modelo de Ollama se pasan a `resolveAiProvider` sin mutar `process.env` | `backend/services/aiService.js` |
+| Fallo de conexión local | Error `503` controlado: “No se pudo conectar a la URL de Ollama proporcionada…” | `aiService.js`, `ChatPanel` |
+| Sesión expirada | Un `401` en solicitudes del dashboard limpia la sesión y redirige a `/login` | `dashboard/page.tsx`, `AuthContext.tsx` |
+| Empty State | Con contador en 0 se muestra “No hay solicitudes pendientes”, sin banner rojo contradictorio | `dashboard/page.tsx` |
+| Error de actualización | El banner de reintento solo aparece si ya hay solicitudes visibles | `dashboard/page.tsx` |
+| Fuzz Testing del generador | Nombres con números iniciales, keywords, símbolos, acentos, ñ, espacios y cadenas largas compilan con Maven | `AUDIT_FUZZ_GENERATOR.md` |
+| Generación Spring Boot | `mvn clean package -DskipTests` sobre AST mixto terminó en `BUILD SUCCESS` | `AUDIT_FUZZ_GENERATOR.md` |
+| Solicitudes de acceso | Aprobación transaccional, verificación de `OWNER`, ACL `VIEWER`/`EDITOR` y estado actualizado | `accessRequestService.js` |
+
+**Criterio de cierre:** los errores esperados usan `400`, `401`, `403`, `404` o `503`; no se exponen secretos ni mensajes internos; el dashboard no presenta estados contradictorios; el generador resiste entradas extremas.
+
+### 11.12 Matriz Requisito → Prueba → Resultado
+
+| Requisito | Prueba / evidencia | Resultado |
+|---|---|---|
+| CU-01 Autenticación | Integración PostgreSQL y HTTP: registro, login, `/me`, token expirado | PASS |
+| CU-02 Gestión de diagramas | Integración de listado, creación, renombrado y borrado | PASS |
+| CU-03 Edición colaborativa | Prueba A/B de dos pestañas, convergencia Yjs y recarga de snapshot | PASS |
+| CU-04 ACL y miembros | Pruebas de roles, `403` para editor/viewer y borrado transaccional | PASS |
+| CU-05 Importación/exportación | Validación JSON previa a Yjs, IDs XMI estables y archivos inválidos | PASS |
+| CU-06 Agente IA | Regresión 32/32, prompt con `selectedElement`, matriz `AUDIT_AI_MASTER.md` | PASS |
+| CU-07 Generación Spring Boot | `mvn clean package -DskipTests` sobre AST mixto y N:M | PASS |
+| CU-08 Manual de usuario | Apertura, búsqueda y cierre del modal | PASS |
+| Solicitudes de acceso | Solicitud, duplicado, aprobación `VIEWER`, rechazo y cascada | PASS |
+| Seguridad SSRF | URL `http(s)`, credenciales rechazadas, URL caída `503` | PASS |
+| Fuzz Testing | Nombres extremos, keywords, ñ, símbolos y cadenas largas | PASS |
+| Build y typecheck | `npm run build`, `npx tsc --noEmit`, `node --check` | PASS |
+
+Los reportes fuente son `AUDIT_QA_FULL.md`, `AUDIT_FUZZ_GENERATOR.md` y `AUDIT_AI_MASTER.md`.
+
+### 11.13 Patrón Strategy y configuración por petición
+
+`aiService.js` implementa dos estrategias con el mismo contrato OpenAI:
+
+- **Groq:** `baseUrl = GROQ_API_URL`, `apiKey = GROQ_API_KEY`, modelos `GROQ_MODEL`/`GROQ_VISION_MODEL`.
+- **Ollama:** `baseUrl = ollamaUrl` enviada por el cliente o `OLLAMA_URL`, modelo `ollamaModel` o `OLLAMA_MODEL`, sin API key.
+
+El frontend guarda `provider`, `ollamaUrl` y `ollamaModel` en `localStorage`; la clave de Groq permanece únicamente en el backend. El comando envía esos valores a `/api/ai/command`, `validation.js` valida proveedor y URL, y `resolveAiProvider()` construye la estrategia para esa petición. No se modifica `process.env`, por lo que dos usuarios pueden usar proveedores distintos concurrentemente. Una URL local inaccesible devuelve `503` con un mensaje accionable.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as ChatPanel
+    participant API as routes/ai.js
+    participant V as validation.js
+    participant S as aiService
+    participant G as Groq
+    participant O as Ollama
+
+    UI->>API: POST /api/ai/command<br/>provider + ollamaUrl + ollamaModel
+    API->>V: validateCommandPayload()
+    V-->>API: proveedor y URL válidos
+    API->>S: getMutationsFromAI(..., providerOptions)
+    alt provider = groq
+        S->>G: POST /chat/completions + Authorization
+        G-->>S: response + mutations
+    else provider = ollama
+        S->>O: POST {ollamaUrl}/chat/completions
+        O-->>S: response + mutations
+    end
+    S-->>API: respuesta validada
+    API-->>UI: JSON { response, mutations }
+```
+
+### 11.14 Mejora de UX: Auto-detección de Modelos de IA Locales
+
+El modal **Configuración Avanzada de IA** incorpora un botón **Detectar** junto al campo de modelo de Ollama. Al pulsarlo:
+
+1. El frontend llama a `GET /api/ai/ollama-models?url={ollamaUrl}` con el JWT de la sesión.
+2. El backend valida la URL y normaliza la base quitando el sufijo `/v1`.
+3. Consulta `GET {base}/api/tags` en Ollama y extrae `models[].name`.
+4. Devuelve un arreglo de strings, por ejemplo `["llama3.1:8b", "qwen2.5-coder:7b"]`.
+5. El modal reemplaza el `<input>` de modelo por un `<select>` con los modelos detectados.
+
+**Seguridad y errores:**
+
+- El endpoint está protegido por `requireAuth`.
+- La URL se valida con `validateOllamaUrl` (`http`/`https`, host, sin credenciales, límite de longitud).
+- Se intenta `127.0.0.1` como fallback si `localhost` no responde por resolución IPv6.
+- Si Ollama no está disponible, se devuelve `503` con mensaje descriptivo y el modal muestra “No se detectaron modelos. Asegúrate de que Ollama esté corriendo.” o el mensaje del backend.
+- Se registra en consola la URL exacta consultada para diagnóstico.
+
+**Evidencia:** mock de `/api/tags` devolvió `["llama3.1:8b", "qwen2.5-coder:7b"]`; URL inaccesible devolvió `503`; URL `ftp` devolvió `400`.
 
 ## 12. Despliegue
 
@@ -654,7 +945,94 @@ El puerto debe coincidir con el configurado por el proveedor.
 | CU-07 | `generator/generate.js` | ZIP y plantillas |
 | CU-08 | `HelpModal`, `manual.ts` | Apertura, búsqueda y cierre |
 
-## 17. Conclusión
+## 17. Evidencias de Implementación y Clean Architecture
+
+### 17.1 Middleware centralizado de errores
+
+**Fuente:** `backend/middleware/errorHandler.js`
+
+```js
+function errorHandler(err, req, res, next) {
+  if (res.headersSent) return next(err);
+
+  let status = err.status || err.statusCode;
+  let message = err.message;
+
+  if (err.name === 'MulterError') {
+    status = 400;
+    message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'El archivo supera el tamaño permitido'
+      : 'Archivo inválido';
+  } else if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    status = 400;
+    message = 'JSON inválido';
+  }
+
+  if (!Number.isInteger(status) || status < 400 || status > 599) status = 500;
+
+  if (status >= 500) {
+    console.error(`${req.method} ${req.originalUrl}`, err);
+    if (!(err instanceof AppError)) message = 'Error interno del servidor';
+  }
+
+  const body = { error: message };
+  if (err instanceof AppError && err.details !== undefined) body.details = err.details;
+  res.status(status).json(body);
+}
+```
+
+Este middleware elimina los `try/catch` repetidos de las rutas. Las rutas usan `asyncHandler` y los servicios lanzan `AppError` o `httpError`; el formato de respuesta queda centralizado.
+
+### 17.2 Transacción atómica de diagrama + ACL
+
+**Fuente:** `backend/services/diagramService.js`
+
+```js
+async function createDiagramWithOwner({ id, name, ownerId }) {
+  const diagramId = safeId(id);
+  if (!diagramId) throw httpError(400, 'ID de diagrama inválido');
+  const diagramName = String(name || '').trim() || 'Nuevo diagrama';
+  const owner = normalizeUserId(ownerId);
+
+  return withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `INSERT INTO core.diagrams (id, name, owner_id)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [diagramId, diagramName, owner]
+    );
+    await client.query(
+      `INSERT INTO auth.diagram_acl (diagram_id, user_id, role)
+       VALUES ($1, $2, 'OWNER')
+       ON CONFLICT (diagram_id, user_id) DO UPDATE SET role = 'OWNER'`,
+      [diagramId, owner]
+    );
+    return rows[0];
+  });
+}
+```
+
+La transacción garantiza que no exista un diagrama sin ACL ni una ACL sin diagrama si falla una de las dos inserciones.
+
+### 17.3 Clasificador de intención en el prompt
+
+**Fuente:** `backend/services/aiService.js`
+
+```text
+TU PRIMERA TAREA ES CLASIFICAR EL MENSAJE:
+1) CONSULTA TEÓRICA O PEDAGÓGICA: pregunta por conceptos, definiciones, diferencias, buenas prácticas o pide una explicación
+   (ej. "¿qué es una clase abstracta?", "explícame la composición", "¿cuándo usar herencia?").
+   - Responde con una explicación didáctica y breve.
+   - Devuelve SIEMPRE "mutations": []. NO modifiques el diagrama.
+2) COMANDO DE ACCIÓN: pide crear, añadir, eliminar, renombrar, actualizar o conectar elementos
+   (ej. "crea una clase Pedido", "añade el atributo total a Pedido", "conecta Cliente con Pedido").
+   - Devuelve las mutaciones necesarias y una confirmación breve en "response".
+3) AMBIGUO: si no está claro si quiere teoría o acción, NO inventes cambios: pide aclaración en "response" con "mutations": [].
+```
+
+El prompt obliga a separar explicación y mutación. Después de la respuesta del LLM, `validateMutations()` aplica una allowlist de acciones y rechaza formatos inválidos antes de tocar el grafo.
+
+## 18. Conclusión
 
 La implementación cumple el objetivo del Segundo Parcial: el asistente IA dejó de ser una llamada aislada y pasó a ser un participante del espacio colaborativo, con identidad verificable, memoria durable y respuestas visibles para todos. La migración a PostgreSQL aportó persistencia, autorización y trazabilidad sin romper el modelo de colaboración basado en Yjs.
 

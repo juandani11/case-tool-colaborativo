@@ -6,6 +6,7 @@ const { pool } = require('./db');
 const authRoutes = require('./routes/auth');
 const aclRoutes = require('./routes/acl');
 const diagramRoutes = require('./routes/diagrams');
+const accessRequestRoutes = require('./routes/accessRequests');
 const aiRoutes = require('./routes/ai');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
@@ -28,6 +29,7 @@ function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api', aclRoutes);
+  app.use('/api', accessRequestRoutes);
   app.use('/api', diagramRoutes);
   app.use('/api/ai', aiRoutes);
 

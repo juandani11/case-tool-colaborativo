@@ -45,6 +45,112 @@ graph LR
 
 El frontend usa `NEXT_PUBLIC_API_URL` y `NEXT_PUBLIC_WS_URL`. El backend usa `PORT`, `DATABASE_URL`, `JWT_SECRET`, `AUTH_ENABLED`, `GROQ_API_KEY`, `GROQ_MODEL` y `GROQ_VISION_MODEL`.
 
+### 2.3.1.3. Diseño de Base de Datos
+
+La base de datos de la aplicación se despliega en **PostgreSQL/Neon** y se sectoriza en tres esquemas lógicos: `auth` para identidad y permisos, `core` para diagramas y snapshots, y `chat` para conversaciones. La sectorización reduce el acoplamiento entre dominios y permite aplicar permisos y respaldos por área.
+
+```mermaid
+erDiagram
+    USERS ||--o{ DIAGRAMS : "owner_id · ON DELETE CASCADE"
+    USERS ||--o{ DIAGRAM_ACL : "user_id · ON DELETE CASCADE"
+    DIAGRAMS ||--o{ MESSAGES : "diagram_id · ON DELETE CASCADE"
+    DIAGRAMS ||--o{ DIAGRAM_ACL : "diagram_id · integridad en servicio"
+    DIAGRAMS ||--o{ ACCESS_REQUESTS : "diagram_id · ON DELETE CASCADE"
+    USERS ||--o{ ACCESS_REQUESTS : "requester_id · ON DELETE CASCADE"
+
+    USERS {
+        uuid id PK
+        varchar username UK
+        varchar email UK
+        varchar password_hash
+        timestamptz created_at
+    }
+
+    DIAGRAMS {
+        varchar id PK
+        varchar name
+        uuid owner_id FK
+        bytea yjs_snapshot
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    DIAGRAM_ACL {
+        uuid id PK
+        varchar diagram_id
+        uuid user_id FK
+        varchar role
+        timestamptz granted_at
+    }
+
+    MESSAGES {
+        uuid id PK
+        varchar diagram_id FK
+        varchar author
+        varchar role
+        text content
+        timestamptz created_at
+    }
+
+    ACCESS_REQUESTS {
+        uuid id PK
+        varchar diagram_id FK
+        uuid requester_id FK
+        varchar status
+        timestamptz created_at
+    }
+```
+
+**Aplicación de las reglas de Rumbaugh:**
+
+| Regla | Aplicación en el modelo | Evidencia |
+|---|---|---|
+| Clase persistente → tabla | `Usuario`, `Diagrama`, `PermisoDiagrama` y `MensajeChat` se materializan como tablas | `auth.users`, `core.diagrams`, `auth.diagram_acl`, `chat.messages` |
+| Atributo → columna | Cada atributo persistente recibe tipo, nulabilidad y restricción | `password_hash`, `yjs_snapshot`, `role`, `content` |
+| Asociación 1:N → clave foránea | Un usuario posee muchos diagramas; un diagrama contiene muchos mensajes | `core.diagrams.owner_id`, `chat.messages.diagram_id` |
+| Asociación N:M → tabla intermedia | Un usuario puede participar en muchos diagramas y un diagrama tener muchos usuarios; la tabla intermedia lleva el rol | `auth.diagram_acl`, restricción única `(diagram_id, user_id)` |
+| Generalización → estrategia relacional | El generador Spring Boot aplica herencia `JOINED` a las jerarquías UML del diagrama del usuario | `@Inheritance(strategy = InheritanceType.JOINED)` en `backend/generator/templates/model.java.hbs` |
+
+**Precisión sobre herencia:** la base de datos propia de la herramienta (`auth`, `core`, `chat`) no contiene una jerarquía de herencia; por tanto, no se inventa una tabla padre. La estrategia `JOINED` se aplica al **backend generado** a partir de los diagramas UML del usuario, donde el generador emite una tabla por clase y `@PrimaryKeyJoinColumn` en las subclases. Esta distinción mantiene la coincidencia entre documentación y código.
+
+**Acciones referenciales:**
+
+- `core.diagrams.owner_id → auth.users.id`: `ON DELETE CASCADE`.
+- `auth.diagram_acl.user_id → auth.users.id`: `ON DELETE CASCADE`.
+- `chat.messages.diagram_id → core.diagrams.id`: `ON DELETE CASCADE`.
+- `auth.diagram_acl.diagram_id` no tiene FK física en el esquema entregado; la integridad se garantiza en `deleteDiagram` mediante una transacción que elimina ACL y diagrama.
+
+El snapshot Yjs se almacena como `bytea` opaco y no se normaliza: representa un CRDT con relojes lógicos e identificadores internos. El chat, en cambio, se normaliza para consultas, memoria de IA y auditoría.
+
+### 2.4. Diagrama de Despliegue (Arquitectura Física)
+
+El diagrama representa los nodos físicos y los protocolos de comunicación. El cliente ejecuta la aplicación Next.js y el cliente Yjs; Vercel entrega el frontend; Railway ejecuta Express y el servidor WebSocket; Neon conserva la base sectorizada; Groq provee inferencia externa.
+
+```mermaid
+flowchart TB
+    CLIENTE["Cliente · Navegador<br/>Next.js 16 + React Flow<br/>Y.Doc + WebsocketProvider"]
+    VERCEL["Servidor Frontend<br/>Vercel<br/>Next.js App Router"]
+    RAILWAY["Servidor Backend<br/>Railway<br/>Node.js + Express + y-websocket"]
+    NEON[("Base de Datos<br/>Neon PostgreSQL<br/>auth / core / chat")]
+    GROQ["IA Externa<br/>Groq Cloud<br/>LLM configurable"]
+
+    CLIENTE -->|HTTPS| VERCEL
+    CLIENTE -->|HTTPS · REST + JWT| RAILWAY
+    CLIENTE <-->|WSS · Yjs + JWT| RAILWAY
+    RAILWAY -->|TCP/IP + TLS| NEON
+    RAILWAY -->|HTTPS| GROQ
+```
+
+**Correspondencia con el despliegue real:**
+
+| Nodo | Plataforma | Proceso | Protocolo |
+|---|---|---|---|
+| Cliente | Navegador | Next.js, React Flow, Yjs Client | HTTPS, WSS |
+| Frontend | Vercel | Next.js App Router | HTTPS |
+| Backend | Railway | Express, WebSocket Yjs, IA y generación | HTTPS, WSS |
+| Base de datos | Neon | PostgreSQL administrado | TCP/IP + TLS |
+| IA | Groq Cloud | Modelo configurable: `gpt-oss-20b` por defecto, Qwen para visión y Whisper para voz | HTTPS |
+
 ## 3. Diseño de componentes
 
 ### 3.1 Frontend
@@ -182,6 +288,128 @@ classDiagram
 | `chatService` | Mensajes y memoria | Llamar a Groq |
 | `aiService` | Prompts, cliente Groq y parsing | Responder HTTP directamente |
 
+### 3.4. Diagrama de clases del dominio persistente
+
+El siguiente diagrama modela las entidades persistentes del backend con atributos tipados y multiplicidades UML 2.5. Las clases representan el dominio almacenado en PostgreSQL; no se muestran las estructuras efímeras de Yjs.
+
+```mermaid
+classDiagram
+    class Usuario {
+        -UUID id
+        -String username
+        -String email
+        -String passwordHash
+        -Date createdAt
+        +getId() UUID
+        +getUsername() String
+    }
+
+    class Diagrama {
+        -String id
+        -String name
+        -UUID ownerId
+        -byte[] yjsSnapshot
+        -Date createdAt
+        -Date updatedAt
+        +getId() String
+        +getOwnerId() UUID
+    }
+
+    class ACL {
+        -UUID id
+        -String diagramId
+        -UUID userId
+        -Rol role
+        -Date grantedAt
+        +getRole() Rol
+    }
+
+    class ChatMessage {
+        -UUID id
+        -String diagramId
+        -String author
+        -String role
+        -String content
+        -Date createdAt
+        +getAuthor() String
+    }
+
+    class AccessRequest {
+        -UUID id
+        -String diagramId
+        -UUID requesterId
+        -AccessRequestStatus status
+        -Date createdAt
+        +isPending() Boolean
+    }
+
+    class Rol {
+        <<enumeration>>
+        OWNER
+        EDITOR
+        VIEWER
+    }
+
+    class AccessRequestStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+    }
+
+    Usuario "1" --> "0..*" Diagrama : posee
+    Usuario "1" --> "0..*" ACL : participa
+    Diagrama "1" --> "0..*" ACL : concede
+    Diagrama "1" --> "0..*" ChatMessage : contiene
+    Usuario "1" --> "0..*" AccessRequest : solicita
+    Diagrama "1" --> "0..*" AccessRequest : recibe
+    ACL --> Rol : clasifica
+    AccessRequest --> AccessRequestStatus : clasifica
+```
+
+**Lectura de multiplicidades:**
+
+- Un `Usuario` posee `0..*` diagramas; cada diagrama tiene un único `owner`.
+- Un `Usuario` participa en `0..*` ACL; cada ACL pertenece a un único usuario.
+- Un `Diagrama` concede `0..*` ACL; cada ACL referencia un único diagrama.
+- Un `Diagrama` contiene `0..*` mensajes; cada mensaje pertenece a un único diagrama.
+- Un `Usuario` puede crear `0..*` solicitudes de acceso; cada `AccessRequest` tiene un único `requester_id`.
+- Un `Diagrama` puede recibir `0..*` solicitudes; cada `AccessRequest` referencia un único `diagram_id`.
+
+### 3.5. Diagrama de Componentes del Backend (Node.js / Clean Architecture)
+
+```mermaid
+flowchart LR
+    CLIENTE["Cliente Next.js"] --> API["API REST (Express)<br/>routes/*"]
+    API --> MW["Middleware<br/>JWT · ACL · errorHandler"]
+    MW --> SVC["Servicios<br/>user · acl · diagram · chat · ai"]
+    SVC --> REPO["Repositorios SQL<br/>db.js + SQL parametrizado"]
+    REPO --> NEON[("Neon PostgreSQL<br/>auth · core · chat")]
+    SVC --> AI["Adaptador IA<br/>aiService"]
+    AI --> GROQ["Groq Cloud"]
+    SVC --> GEN["Generador<br/>Handlebars + ZIP"]
+    WS["WebSocket Server (Yjs)<br/>realtime/yjs.js"] --> SVC
+    WS --> REPO
+```
+
+La capa de repositorios se implementa de forma pragmática en `db.js` y en las funciones SQL de los servicios; no existe una carpeta `repositories/` separada. El diagrama mantiene la dirección de dependencias de Clean Architecture: la API no accede directamente a PostgreSQL, sino a través de servicios y de la capa de datos. El servidor WebSocket reutiliza los mismos servicios de ACL, diagrama y chat, evitando duplicar reglas de negocio.
+
+### 3.6. Diagrama de Componentes del Backend Generado (Spring Boot)
+
+El generador de `backend/generator/generate.js` produce un proyecto Spring Boot con separación en cuatro capas. El modelo JPA se deriva del AST y las plantillas Handlebars materializan controladores, servicios, repositorios y entidades.
+
+```mermaid
+flowchart LR
+    CONTROLLER["Capa Controlador<br/>@RestController"] --> SERVICE["Capa Servicio<br/>@Service"]
+    SERVICE --> REPOSITORY["Capa Repositorio<br/>JpaRepository"]
+    REPOSITORY --> MODEL["Capa Modelo<br/>@Entity"]
+    SERVICE --> MODEL
+    MODEL --> POSTGRES[("PostgreSQL<br/>tablas generadas")]
+    REPOSITORY --> POSTGRES
+```
+
+El flujo de dependencias es unidireccional: el controlador no conoce SQL, el servicio orquesta casos de uso y el repositorio encapsula el acceso a datos. La herencia UML se traduce con `@Inheritance(strategy = InheritanceType.JOINED)` en la raíz de la jerarquía.
+
 ## 4. Diseño de clases del asistente IA
 
 ### 4.1 Clases conceptuales de diseño
@@ -230,7 +458,9 @@ ChatPanel
 | Emisión por Yjs | Solo respuesta HTTP | Todos los colaboradores ven la IA |
 | Fallback de texto | Fallar ante JSON inválido | Mejora la recuperación de consultas teóricas |
 
-## 5. Diseño de la base de datos
+## 5. Anexo de detalle: base de datos
+
+Este anexo desarrolla el modelo resumido en **2.3.1.3** y conserva el DDL de referencia, la justificación de normalización y las desviaciones controladas.
 
 ### 5.1 Sectorización
 
@@ -257,6 +487,8 @@ erDiagram
     USERS ||--o{ DIAGRAM_ACL : recibe
     DIAGRAMS ||--o{ DIAGRAM_ACL : concede
     DIAGRAMS ||--o{ MESSAGES : contiene
+    USERS ||--o{ ACCESS_REQUESTS : solicita
+    DIAGRAMS ||--o{ ACCESS_REQUESTS : recibe
 
     USERS {
         uuid id PK
@@ -289,6 +521,14 @@ erDiagram
         varchar author
         varchar role
         text content
+        timestamptz created_at
+    }
+
+    ACCESS_REQUESTS {
+        uuid id PK
+        varchar diagram_id FK
+        uuid requester_id FK
+        varchar status
         timestamptz created_at
     }
 ```
@@ -339,6 +579,24 @@ Restricción única: `(diagram_id, user_id)`.
 | `content` | `text` | NOT NULL | Contenido del mensaje |
 | `created_at` | `timestamptz` | NULL | default `CURRENT_TIMESTAMP` |
 
+### 5.6.1 `auth.access_requests`
+
+| Columna | Tipo | Nulabilidad | Restricción |
+|---|---|---|---|
+| `id` | `uuid` | NOT NULL | PK, default `uuid_generate_v4()` |
+| `diagram_id` | `varchar` | NOT NULL | FK a `core.diagrams(id)` ON DELETE CASCADE |
+| `requester_id` | `uuid` | NOT NULL | FK a `auth.users(id)` ON DELETE CASCADE |
+| `status` | `varchar` | NOT NULL | CHECK `PENDING`, `APPROVED`, `REJECTED`; default `PENDING` |
+| `created_at` | `timestamptz` | NOT NULL | default `CURRENT_TIMESTAMP` |
+
+**Restricciones adicionales:**
+
+- Índice único parcial `(diagram_id, requester_id) WHERE status = 'PENDING'`: un usuario solo puede tener una solicitud pendiente por diagrama.
+- Índice `(diagram_id, status)` para listar solicitudes pendientes del propietario.
+- Índice `(requester_id)` para consultas por solicitante.
+
+La aprobación se ejecuta en una transacción: se bloquea la solicitud con `FOR UPDATE`, se verifica que el usuario sea el `OWNER` del diagrama, se inserta/actualiza la ACL con el rol elegido y se cambia `status` a `APPROVED`. Si algo falla, la transacción hace `ROLLBACK`.
+
 ### 5.7 DDL de referencia
 
 ```sql
@@ -380,6 +638,23 @@ CREATE TABLE chat.messages (
   content text NOT NULL,
   created_at timestamptz DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE auth.access_requests (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  diagram_id varchar NOT NULL REFERENCES core.diagrams(id) ON DELETE CASCADE,
+  requester_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  status varchar NOT NULL DEFAULT 'PENDING'
+    CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX access_requests_pending_unique
+  ON auth.access_requests (diagram_id, requester_id)
+  WHERE status = 'PENDING';
+CREATE INDEX access_requests_diagram_status_idx
+  ON auth.access_requests (diagram_id, status);
+CREATE INDEX access_requests_requester_idx
+  ON auth.access_requests (requester_id);
 ```
 
 > El DDL asume que la extensión `uuid-ossp` está disponible, porque el esquema real usa `uuid_generate_v4()`.
@@ -391,6 +666,8 @@ CREATE TABLE chat.messages (
 | `core.diagrams.owner_id` | `auth.users.id` | CASCADE |
 | `auth.diagram_acl.user_id` | `auth.users.id` | CASCADE |
 | `chat.messages.diagram_id` | `core.diagrams.id` | CASCADE |
+| `auth.access_requests.diagram_id` | `core.diagrams.id` | CASCADE |
+| `auth.access_requests.requester_id` | `auth.users.id` | CASCADE |
 | `auth.diagram_acl.diagram_id` | No física | Gestión en servicio |
 
 ### 5.9 Normalización
@@ -407,7 +684,16 @@ El modelo está en **tercera forma normal** para los datos relacionales:
 
 ## 6. Aplicación de las reglas de Rumbaugh
 
-Las reglas de transformación del modelo de objetos al modelo relacional se aplican en cuatro pasos explícitos.
+Las reglas de transformación del modelo de objetos al modelo relacional se aplican en cuatro pasos explícitos. El criterio rector es preservar la identidad, la multiplicidad y las acciones referenciales del modelo UML sin introducir tablas redundantes.
+
+| Elemento UML | Transformación Rumbaugh | Resultado en PostgreSQL |
+|---|---|---|
+| Clase persistente | Una tabla por clase con clave primaria | `auth.users`, `core.diagrams`, `chat.messages` |
+| Atributo simple | Una columna con dominio y nulabilidad | `username`, `name`, `content` |
+| Asociación 1:N | Clave foránea en el lado muchos | `owner_id`, `diagram_id` |
+| Asociación N:M con atributos | Tabla intermedia con PK propia y columnas de relación | `auth.diagram_acl` con `role` y `granted_at` |
+| Generalización | Estrategia `JOINED` en el backend generado | Tabla por clase + `@PrimaryKeyJoinColumn` |
+| Agregación/composición | FK con `ON DELETE CASCADE` cuando el ciclo de vida depende del todo | `chat.messages.diagram_id` |
 
 ### 6.1 Regla 1: clase persistente → tabla
 
@@ -584,6 +870,45 @@ stateDiagram-v2
     Emitido --> Visible: observer
     Error --> Local: reintento manual
 ```
+
+### 8.3 Diagrama de Máquina de Estados y transformación Estado → Relacional
+
+El siguiente autómata modela el comportamiento observable del diagrama desde su creación hasta la exportación. Es un diagrama de máquina de estados UML 2.5, no un diagrama de actividades.
+
+```mermaid
+stateDiagram-v2
+    [*] --> BORRADOR
+    BORRADOR --> EN_EDICION: abrir lienzo / conectar Yjs
+    EN_EDICION --> SINCRONIZADO: guardar snapshot (debounce)
+    SINCRONIZADO --> EN_EDICION: nuevo update Yjs
+    SINCRONIZADO --> EXPORTADO: POST /api/generate
+    EXPORTADO --> [*]
+```
+
+**Regla de transformación Estado → Relacional.** Un estado del autómata se transforma en un dominio enumerado y una columna de la tabla que representa la entidad. Las transiciones se implementan en los servicios de aplicación; no se almacenan como filas independientes.
+
+```sql
+CREATE TYPE core.diagram_state AS ENUM (
+  'BORRADOR',
+  'EN_EDICION',
+  'SINCRONIZADO',
+  'EXPORTADO'
+);
+
+ALTER TABLE core.diagrams
+  ADD COLUMN state core.diagram_state NOT NULL DEFAULT 'BORRADOR';
+```
+
+| Estado UML | Significado | Mapeo relacional propuesto | Implementación actual |
+|---|---|---|---|
+| `BORRADOR` | Fila creada, aún sin snapshot | `state = 'BORRADOR'`; `yjs_snapshot IS NULL` | Derivado de `yjs_snapshot IS NULL` |
+| `EN_EDICION` | Documento Yjs activo con clientes conectados | `state = 'EN_EDICION'` | Estado efímero de la sala; no se persiste |
+| `SINCRONIZADO` | Snapshot guardado en PostgreSQL | `state = 'SINCRONIZADO'`; `updated_at` actualizado | Derivado de `yjs_snapshot IS NOT NULL` y `updated_at` |
+| `EXPORTADO` | Backend generado y descargado | `state = 'EXPORTADO'` o `exported_at` | Se registra en la respuesta; no se persiste actualmente |
+
+> **Trazabilidad de diseño:** el esquema aprobado de `core.diagrams` no incluye actualmente la columna `state`. El autómata documenta el comportamiento y la regla de transformación; la columna y el tipo ENUM se presentan como la materialización relacional prevista. Si se incorpora una migración, `createDiagramWithOwner` debe inicializar `BORRADOR`, el guardado de snapshot debe promover a `SINCRONIZADO` y la exportación debe registrar `EXPORTADO` o `exported_at`.
+
+**Justificación:** persistir el estado como ENUM evita valores inválidos, reduce el costo de comparación frente a texto libre y mantiene una correspondencia directa con el autómata. Los estados efímeros (`EN_EDICION`) se derivan de la presencia de conexiones WebSocket para no generar escrituras innecesarias en cada apertura del lienzo.
 
 ## 9. Diseño de API
 

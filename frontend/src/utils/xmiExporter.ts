@@ -16,6 +16,12 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+function xmiId(value: string): string {
+  const raw = String(value || '').trim() || 'ID_unknown';
+  const safe = raw.replace(/[^A-Za-z0-9_.-]/g, '_');
+  return /^[A-Za-z_]/.test(safe) ? safe : `ID_${safe}`;
+}
+
 function parseMultiplicity(card?: string): { lower: string; upper: string } {
   if (!card || card === '') return { lower: '1', upper: '1' };
   switch (card) {
@@ -75,29 +81,29 @@ function buildDataTypes(types: string[]): string {
 
 function buildAttribute(
   attr: Attribute,
-  classPrefix: string,
+  classId: string,
   attrIndex: number
 ): string {
-  const id = `A_${classPrefix}_${attrIndex}`;
+  const id = `A_${classId}_${attrIndex}`;
   const vis = attr.isPk ? 'private' : 'public';
   return `      <ownedAttribute xmi:id="${id}" name="${escapeXml(attr.name)}" visibility="${vis}" type="DT_${escapeXml(attr.type)}"/>\n`;
 }
 
 function buildMethod(
   method: Method,
-  classPrefix: string,
+  classId: string,
   methodIndex: number
 ): string {
-  const opId = `O_${classPrefix}_${methodIndex}`;
+  const opId = `O_${classId}_${methodIndex}`;
   let xml = `      <ownedOperation xmi:id="${opId}" name="${escapeXml(method.name)}" visibility="${method.visibility}">\n`;
 
   method.parameters.forEach((param, pi) => {
-    const paramId = `P_${classPrefix}_${methodIndex}_param${pi}`;
+    const paramId = `P_${classId}_${methodIndex}_param${pi}`;
     xml += `        <ownedParameter xmi:id="${paramId}" name="${escapeXml(param.name)}" direction="in" type="DT_${escapeXml(param.type)}"/>\n`;
   });
 
   if (method.returnType && method.returnType !== 'void') {
-    const retId = `P_${classPrefix}_${methodIndex}_ret`;
+    const retId = `P_${classId}_${methodIndex}_ret`;
     xml += `        <ownedParameter xmi:id="${retId}" direction="return" type="DT_${escapeXml(method.returnType)}"/>\n`;
   }
 
@@ -107,19 +113,18 @@ function buildMethod(
 
 function buildClass(node: Node<EntityNodeData>, index: number): string {
   const data = node.data;
-  const prefix = data.label.replace(/[^a-zA-Z0-9]/g, '_');
+  const classId = xmiId(node.id || `node_${index}`);
   const isInterface = data.stereotype === 'interface';
   const elementType = isInterface ? 'uml:Interface' : 'uml:Class';
-  const id = isInterface ? `I_${prefix}` : `C_${prefix}`;
 
-  let xml = `    <packagedElement xmi:type="${elementType}" xmi:id="${id}" name="${escapeXml(data.label)}" visibility="public">\n`;
+  let xml = `    <packagedElement xmi:type="${elementType}" xmi:id="${classId}" name="${escapeXml(data.label)}" visibility="public">\n`;
 
   (data.attributes || []).forEach((attr, ai) => {
-    xml += buildAttribute(attr, prefix, ai);
+    xml += buildAttribute(attr, classId, ai);
   });
 
   (data.methods || []).forEach((method, mi) => {
-    xml += buildMethod(method, prefix, mi);
+    xml += buildMethod(method, classId, mi);
   });
 
   xml += `    </packagedElement>\n`;
@@ -145,23 +150,20 @@ function buildAssociation(
 
   const sourceNode = nodes[sourceIdx];
   const targetNode = nodes[targetIdx];
-  const srcPrefix = sourceNode.data?.label?.replace(/[^a-zA-Z0-9]/g, '_') || `N${sourceIdx}`;
-  const tgtPrefix = targetNode.data?.label?.replace(/[^a-zA-Z0-9]/g, '_') || `N${targetIdx}`;
-  const isSrcIface = sourceNode.data?.stereotype === 'interface';
-  const isTgtIface = targetNode.data?.stereotype === 'interface';
-  const srcId = isSrcIface ? `I_${srcPrefix}` : `C_${srcPrefix}`;
-  const tgtId = isTgtIface ? `I_${tgtPrefix}` : `C_${tgtPrefix}`;
+  const srcId = xmiId(sourceNode.id || `node_${sourceIdx}`);
+  const tgtId = xmiId(targetNode.id || `node_${targetIdx}`);
+  const edgeId = xmiId(edge.id || `edge_${index}`);
 
   // Generalization (inheritance)
   if (edgeType === 'INHERITANCE') {
-    const genId = `Gen_${srcPrefix}_${tgtPrefix}_${index}`;
+    const genId = `Gen_${edgeId}`;
     let xml = `    <packagedElement xmi:type="uml:Generalization" xmi:id="${genId}" specific="${srcId}" general="${tgtId}"/>\n`;
     return xml;
   }
 
   const sourceMult = parseMultiplicity(data?.cardinalityFrom);
   const targetMult = parseMultiplicity(data?.cardinalityTo);
-  const assocId = `Ass_${srcPrefix}_${tgtPrefix}_${index}`;
+  const assocId = `Ass_${edgeId}`;
 
   let aggAttr = ' aggregation="none"';
   if (edgeType === 'AGGREGATION') {

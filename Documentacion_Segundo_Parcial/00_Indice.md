@@ -1,10 +1,10 @@
 # Índice General
 
-> **Proyecto:** Herramienta CASE Colaborativa con IA  
-> **Documento:** Ingeniería de software del Segundo Parcial  
-> **Versión:** 1.0  
-> **Fecha:** 31 de octubre de 2026  
-> **Repositorio:** `case-tool`  
+> **Proyecto:** Herramienta CASE Colaborativa con IA
+> **Documento:** Ingeniería de software del Segundo Parcial
+> **Versión:** 1.1 (entrega final)
+> **Fecha:** 1 de noviembre de 2026
+> **Repositorio:** `case-tool`
 > **Alcance:** arquitectura, proceso de desarrollo, análisis, diseño e implementación del asistente IA colaborativo con identidad y memoria contextual, y de la persistencia sectorizada en PostgreSQL.
 
 ## 1. Propósito del vault
@@ -22,7 +22,12 @@ La documentación describe el sistema **realmente implementado**, no una propues
 | 2 | [[02_Proceso]] | Proceso Unificado, actores, requisitos, ocho casos de uso, iteraciones y CU-06 detallado |
 | 3 | [[03_Analisis]] | Modelo conceptual, paquetes, análisis BCE, contratos y trazabilidad |
 | 4 | [[04_Diseno]] | Diagramas de despliegue, clases, modelo relacional, Rumbaugh, secuencias y estados |
-| 5 | [[05_Implementacion]] | Organización del código, cuatro capas del backend, CU-06, pruebas, despliegue y limitaciones |
+| 5 | [[05_Implementacion]] | Organización del código, capas del backend, CU-06, pruebas, despliegue y limitaciones |
+| 6 | [[06_Trazabilidad]] | Matriz CU → UI → endpoint → tabla → prueba QA |
+| 7 | [[07_Despliegue]] | Guía DevOps para Vercel, Railway, Neon, Ollama y Ngrok |
+| 8 | [[08_Manual_Usuario]] | Manual rápido para registro, edición, colaboración, IA y generación |
+| 9 | [[09_Conclusiones]] | Conclusiones y trabajo futuro |
+| 10 | [[10_Anexos]] | Glosario técnico y bibliografía APA 7 |
 
 ## 3. Resumen ejecutivo
 
@@ -45,6 +50,11 @@ El orden de este vault replica el índice lógico del informe:
 | Análisis de requisitos y modelo BCE | [[03_Analisis]] |
 | Diseño arquitectónico, de clases, de datos y de secuencias | [[04_Diseno]] |
 | Implementación, pruebas, despliegue y conclusiones | [[05_Implementacion]] |
+| Trazabilidad formal | [[06_Trazabilidad]] |
+| Guía de despliegue | [[07_Despliegue]] |
+| Manual de usuario | [[08_Manual_Usuario]] |
+| Conclusiones y trabajo futuro | [[09_Conclusiones]] |
+| Glosario y bibliografía | [[10_Anexos]] |
 
 ## 5. Alcance documentado
 
@@ -58,11 +68,15 @@ El orden de este vault replica el índice lógico del informe:
 - Aplicación de las reglas de transformación de Rumbaugh.
 - Diagramas de secuencia del asistente IA y de la colaboración.
 - Implementación real, pruebas ejecutadas y limitaciones conocidas.
+- Solicitudes de acceso de Fase 3 y aprobación transaccional.
+- Configuración dinámica de IA Groq/Ollama y auto-detección de modelos.
+- Trazabilidad formal, guía de despliegue, manual de usuario, conclusiones y anexos.
 
 ### 5.2 Fuera de alcance
 
-- Exportación a PlantUML o SQL.
-- Invitaciones y solicitudes de acceso pendientes de aprobación.
+- Exportación a PlantUML o SQL nativo.
+- Integración directa con Enterprise Architect más allá de XMI.
+- Despliegue en microservicios con adaptador Yjs distribuido.
 - Read-only transaccional en el protocolo Yjs.
 - Aplicación móvil funcional; existe únicamente como stub.
 - Facturación, auditoría avanzada o alta disponibilidad multirregión.
@@ -124,12 +138,16 @@ Obsidian no exporta `.docx` de forma nativa. Opciones recomendadas:
 
 | Elemento | Estado |
 |---|---|
-| Arquitectura | Documentada |
-| Proceso y casos de uso | Documentado |
-| Análisis BCE | Documentado |
-| Diseño de datos | Documentado con esquema real |
-| Implementación | Documentada |
-| Pruebas | Documentadas |
+| Arquitectura 4+1 | Documentada con vistas lógica, procesos, implementación, despliegue y casos de uso |
+| Proceso PUDS | Documentado con seis iteraciones: IA, concurrencia, acceso y configuración |
+| Casos de uso UML | Documentados con actores, flujos y diagramas Mermaid |
+| Análisis BCE | Documentado con frontera, control y entidad |
+| Diseño de datos y Rumbaugh | Documentado con ERD y coincidencia con el esquema real |
+| Implementación y refactorización | Documentada con P0/P1 y trazas de código |
+| Fase 3: solicitudes de acceso | Documentada con endpoints, tabla `auth.access_requests` y aprobación transaccional |
+| Configuración IA Groq/Ollama | Documentada con Strategy, BYOK y persistencia local de URL/modelo |
+| Dashboard UI/UX | Documentado con CRUD de tarjetas, fechas y empty states |
+| Verificación y validación | Documentadas con pruebas manuales, build, tsc y regresión IA |
 | Limitaciones | Documentadas |
 
 ## 10. Enlaces de continuidad
@@ -139,3 +157,21 @@ Obsidian no exporta `.docx` de forma nativa. Opciones recomendadas:
 - Estudiar el análisis del asistente IA en [[03_Analisis]].
 - Consultar el modelo relacional y las secuencias en [[04_Diseno]].
 - Verificar la implementación y las pruebas en [[05_Implementacion]].
+- Consultar la matriz formal en [[06_Trazabilidad]].
+- Reproducir el entorno con [[07_Despliegue]].
+- Seguir la demo con [[08_Manual_Usuario]].
+- Revisar el cierre en [[09_Conclusiones]].
+- Consultar definiciones y referencias en [[10_Anexos]].
+
+## 11. Matriz de Trazabilidad
+
+| Requisito (CU) | Módulo de Diseño (Componente) | Endpoint de API / Función | Prueba de Verificación (Estado) |
+|---|---|---|---|
+| CU-01 Autenticarse | `AuthContext`, `routes/auth.js`, `userService` | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | Integración PostgreSQL 23/23 PASS |
+| CU-02 Gestionar diagramas | `dashboard/page.tsx`, `routes/diagrams.js`, `diagramService` | `GET/POST /api/diagrams`, `POST /api/diagrams/:id`, `PUT /rename`, `DELETE /:id` | Integración PostgreSQL 23/23 PASS |
+| CU-03 Editar colaborativamente | `useCollaborativeFlow`, `realtime/yjs.js`, helpers Yjs | WebSocket `diagram-room-<id>`, `GET /api/diagrams/:id` | Prueba manual A/B y recarga PASS |
+| CU-04 Gestionar miembros | `MembersPanel`, `useDiagramMembers`, `routes/acl.js`, `aclService` | `GET /api/diagrams/:id/acl`, `POST/PATCH/DELETE /members` | Integración PostgreSQL 23/23 PASS |
+| CU-05 Exportar/importar | `Toolbar`, `diagramExportImport`, `xmiExporter`, `xmiImporter` | Funciones locales JSON/XMI | Prueba manual de exportación e importación PASS |
+| CU-06 Interactuar con Agente IA | `ChatPanel`, `useAICommand`, `routes/ai.js`, `aiService`, `chatService` | `POST /api/ai/command`, `/transcribe`, `/from-image` | Regresión IA 32/32 PASS |
+| CU-07 Generar backend | `Toolbar`, `routes/ai.js`, `generator/generate.js` | `POST /api/generate` | ZIP generado y compilación de plantillas PASS |
+| CU-08 Consultar manual | `HelpModal`, `useHelpModal`, `data/manual.ts` | Botón Ayuda / `F1` | Prueba manual de apertura, búsqueda y cierre PASS |

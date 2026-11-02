@@ -110,7 +110,7 @@ const EntityNode = ({ data, selected }: NodeProps<EntityNodeData>) => {
           )}
         </div>
         <div className={`font-bold text-sm mt-0.5 ${isInterface ? 'text-purple-800 italic' : isAbstract ? 'text-white italic' : 'text-white'}`}>
-          {data.label}
+          {data.label?.trim() || 'SinNombre'}
         </div>
       </div>
 

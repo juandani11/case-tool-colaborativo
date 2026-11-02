@@ -31,7 +31,8 @@ import ChatPanel from '../../../components/ChatPanel';
 // PresencePanel se renderiza dentro de Toolbar, no directamente en page
 import { useCollaborativeFlow } from '../../../hooks/useCollaborativeFlow';
 import { useAICommand } from '../../../hooks/useAICommand';
-import { EntityNodeData, RelationshipData, UmlRelationshipType } from '../../../types/diagram';
+import { EntityNodeData, RelationshipData, SelectedElementContext, UmlRelationshipType } from '../../../types/diagram';
+import { useAiProvider } from '../../../hooks/useAiProvider';
 import { nodesToAST } from '../../../utils/ast';
 import { importFromXmi } from '../../../utils/xmiImporter';
 import { exportToXmi, downloadXmi } from '../../../utils/xmiExporter';
@@ -86,8 +87,12 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [connectionType, setConnectionType] = useState<UmlRelationshipType>('ASSOCIATION');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const { config: aiConfig, setConfig: setAiConfig } = useAiProvider();
+  const [accessRequestState, setAccessRequestState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [accessRequestMessage, setAccessRequestMessage] = useState('');
 
   // ── Modo conexion (paleta de relaciones) ─────────────────────────
   const [activeRelationType, setActiveRelationType] = useState<string | null>(null);
@@ -300,6 +305,56 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   // El reset de modo conexion no hace falta: el componente se remonta con
   // key={diagramId} al navegar (ver DiagramPage), así que el estado nace limpio.
 
+  const selectedElementForAI: SelectedElementContext | null = (() => {
+    const node = nodes.find((item) => item.id === selectedNodeId) as Node<EntityNodeData> | undefined;
+    if (node) {
+      return {
+        kind: 'node',
+        id: node.id,
+        name: node.data.label,
+        stereotype: node.data.stereotype,
+        attributes: (node.data.attributes || []).map((attribute) => ({
+          name: attribute.name,
+          type: attribute.type,
+          isPk: attribute.isPk,
+          nullable: attribute.nullable,
+          unique: attribute.unique,
+        })),
+        methods: (node.data.methods || []).map((method) => ({
+          name: method.name,
+          returnType: method.returnType,
+          visibility: method.visibility,
+          parameters: (method.parameters || []).map((parameter) => ({
+            name: parameter.name,
+            type: parameter.type,
+          })),
+        })),
+      };
+    }
+
+    const edge = edges.find((item) => item.id === selectedEdgeId) as Edge<RelationshipData> | undefined;
+    if (!edge) return null;
+
+    const source = nodes.find((item) => item.id === edge.source) as Node<EntityNodeData> | undefined;
+    const target = nodes.find((item) => item.id === edge.target) as Node<EntityNodeData> | undefined;
+    return {
+      kind: 'edge',
+      id: edge.id,
+      type: edge.data?.type || 'ASSOCIATION',
+      source: {
+        id: edge.source,
+        name: source?.data.label || edge.source,
+      },
+      target: {
+        id: edge.target,
+        name: target?.data.label || edge.target,
+      },
+      ...(edge.data?.label ? { label: edge.data.label } : {}),
+      ...(edge.data?.cardinalityFrom ? { cardinalityFrom: edge.data.cardinalityFrom } : {}),
+      ...(edge.data?.cardinalityTo ? { cardinalityTo: edge.data.cardinalityTo } : {}),
+    };
+  })();
+
   const {
     command,
     setCommand,
@@ -313,6 +368,10 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     diagramId: currentDiagramId || '',
     nodes,
     edges,
+    selectedElement: selectedElementForAI,
+    provider: aiConfig.provider,
+    ollamaUrl: aiConfig.ollamaUrl,
+    ollamaModel: aiConfig.ollamaModel,
     addNode,
     updateNode,
     removeNode,
@@ -377,6 +436,37 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const { authEnabled, user } = useAuth();
   const isViewer = authEnabled && diagramRole === 'VIEWER';
   const noAccess = authEnabled && !roleLoading && diagramRole === 'NONE';
+
+  const handleRequestAccess = useCallback(async () => {
+    if (!currentDiagramId || accessRequestState === 'sending' || accessRequestState === 'sent') return;
+    setAccessRequestState('sending');
+    setAccessRequestMessage('');
+    try {
+      const res = await apiFetch(
+        `${API_BASE}/api/diagrams/${encodeURIComponent(currentDiagramId)}/request-access`,
+        { method: 'POST' }
+      );
+      if (res.ok) {
+        setAccessRequestState('sent');
+        setAccessRequestMessage('Solicitud enviada. Espera la aprobación del dueño.');
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      const message = typeof data?.error === 'string'
+        ? data.error
+        : 'No se pudo enviar la solicitud.';
+      if (res.status === 409 && message.toLowerCase().includes('pendiente')) {
+        setAccessRequestState('sent');
+        setAccessRequestMessage('Ya tienes una solicitud pendiente. Espera la respuesta del dueño.');
+        return;
+      }
+      setAccessRequestState('error');
+      setAccessRequestMessage(message);
+    } catch {
+      setAccessRequestState('error');
+      setAccessRequestMessage('No se pudo conectar con el servidor.');
+    }
+  }, [currentDiagramId, accessRequestState]);
 
   // Responsive: auto-collapse sidebar on small screens
   useEffect(() => {
@@ -473,6 +563,11 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const selectedData = selectedNode?.data as EntityNodeData | undefined;
+  const selectedLabel = selectedData?.label?.trim().toLocaleLowerCase() || '';
+  const duplicateNodeName = Boolean(selectedNodeId && selectedLabel) && nodes.some(
+    (node) => node.id !== selectedNodeId
+      && (((node.data as EntityNodeData)?.label || '').trim().toLocaleLowerCase() === selectedLabel)
+  );
 
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId);
   const selectedEdgeData = selectedEdge?.data as RelationshipData | undefined;
@@ -611,15 +706,17 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
       relationshipType = 'COMPOSITION';
     }
 
+    const isSelfLoop = connection.source === connection.target;
     const newEdge = {
       id: `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       source: connection.source,
       target: connection.target,
-      type: edgeType,
+      type: isSelfLoop ? 'selfloop' : edgeType,
       data: {
         type: relationshipType,
         cardinalityFrom: '1',
         cardinalityTo: '1',
+        isSelfLoop,
       },
     };
     addEdge(newEdge);
@@ -636,7 +733,9 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   }, [reactFlow]);
 
   const handleImportXmi = useCallback((file: File) => {
-    importFromXmi(file, { addNode, addEdge });
+    importFromXmi(file, { addNode, addEdge }).catch((error) => {
+      console.error('Error al importar XMI:', error);
+    });
   }, [addNode, addEdge]);
 
   return (
@@ -693,11 +792,31 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
               setActiveRelationType(type);
               setPendingSource(null);
             }}
+            collapsed={paletteCollapsed}
+            onToggleCollapse={() => {
+              setPaletteCollapsed(true);
+              setActiveRelationType(null);
+              setPendingSource(null);
+            }}
           />
         )}
 
         {/* 3. Canvas */}
         <div className="flex-1 min-h-0 relative" onDragOver={onDragOver} onDrop={onDrop}>
+          {!isViewer && paletteCollapsed && (
+            <button
+              type="button"
+              onClick={() => setPaletteCollapsed(false)}
+              className="absolute left-2 top-2 z-30 w-8 h-8 flex items-center justify-center rounded-md border border-gray-200 bg-white/95 text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition-colors"
+              title="Mostrar paleta"
+              aria-label="Mostrar paleta"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+
           {/* Floating Entity Editor Panel */}
           {selectedNodeId && selectedData && (
             <div className="absolute right-4 top-4 z-30 flex flex-col gap-2">
@@ -708,6 +827,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
                 onClose={handleCloseEntityPanel}
                 associationInfo={selectedNodeAssociationInfo}
                 onDissolveAssociation={() => handleDissolveAssociationClass(selectedNodeId)}
+                duplicateName={duplicateNodeName}
               />
               <button
                 onClick={handleDeleteSelectedNode}
@@ -765,15 +885,31 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
               <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-8 max-w-sm text-center space-y-3">
                 <h2 className="font-bold text-gray-800">No tienes acceso a este diagrama</h2>
                 <p className="text-sm text-gray-500">
-                  Pide al owner que te invite como editor o lector.
+                  Envía una solicitud al propietario para que te conceda acceso como lector o editor.
                 </p>
                 <button
-                  disabled
-                  title="Disponible en Fase 3"
-                  className="w-full py-2 bg-gray-200 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed"
+                  type="button"
+                  onClick={handleRequestAccess}
+                  disabled={accessRequestState === 'sending' || accessRequestState === 'sent'}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                 >
-                  Solicitar acceso (Fase 3)
+                  {accessRequestState === 'sending'
+                    ? 'Enviando solicitud...'
+                    : accessRequestState === 'sent'
+                    ? 'Solicitud enviada'
+                    : 'Solicitar Acceso'}
                 </button>
+                {accessRequestMessage && (
+                  <p
+                    className={`text-xs rounded-md px-3 py-2 ${
+                      accessRequestState === 'error'
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}
+                  >
+                    {accessRequestMessage}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -891,6 +1027,8 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
           readOnly={isViewer}
           currentUsername={currentUsername}
           currentClientId={currentClientId}
+          aiConfig={aiConfig}
+          onAiConfigChange={setAiConfig}
         />
       </div>
     </div>

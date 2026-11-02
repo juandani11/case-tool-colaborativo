@@ -42,6 +42,351 @@ La idea arquitectónica central es que **el estado canónico del diagrama vive e
 └───────────────────────────────┘
 ```
 
+## 1.8. Arquitectura de Software
+
+La arquitectura se documenta con el **Modelo 4+1 de Kruchten**, que permite describir el sistema desde cinco vistas complementarias sin mezclar niveles de abstracción. Cada vista responde a una preocupación distinta y se materializa en artefactos verificables del repositorio.
+
+| Vista | Pregunta que responde | Artefactos principales |
+|---|---|---|
+| Lógica | ¿Qué abstracciones y responsabilidades componen el sistema? | `services/*`, `routes/*`, `realtime/yjs.js`, hooks y tipos |
+| Procesos | ¿Cómo colaboran los procesos en tiempo de ejecución? | Express, WebSocket Yjs, Groq, PostgreSQL |
+| Implementación | ¿Cómo se organiza el código y sus dependencias? | `frontend/`, `backend/`, `app.js`, `server.js` |
+| Despliegue | ¿Dónde se ejecuta cada nodo? | Vercel, Railway, Neon, Groq |
+| Casos de uso | ¿Qué valor entrega el sistema y a quién? | CU-01 a CU-08, actores y escenarios |
+
+La decisión central es mantener **Yjs como estado canónico del grafo** y PostgreSQL como registro durable. React Flow es una proyección de la vista, no la fuente de verdad. Esta separación reduce el acoplamiento entre colaboración, persistencia e interfaz.
+
+### 1.8.1. Arquitectura del Backend (Node.js)
+
+El backend adopta una **adaptación pragmática de Clean Architecture** con dependencias dirigidas hacia el dominio y la persistencia, sin introducir capas vacías. La composición se concentra en dos puntos de entrada: `server.js` para el ciclo de vida del proceso y `app.js` para la aplicación HTTP.
+
+| Capa | Archivos | Responsabilidad | Depende de |
+|---|---|---|---|
+| Bootstrap / composición | `server.js`, `app.js` | Crear HTTP, montar Express, inicializar PostgreSQL y conectar el WebSocket | Capas internas |
+| Transporte / controladores | `routes/auth.js`, `routes/diagrams.js`, `routes/acl.js`, `routes/ai.js` | Validar entrada, aplicar autenticación y construir respuestas | Servicios, middleware |
+| Aplicación / dominio | `services/userService.js`, `aclService.js`, `diagramService.js`, `chatService.js`, `aiService.js` | Reglas de negocio, transacciones, snapshots, prompts y memoria | `db.js`, `errors.js` |
+| Acceso a datos | `db.js` y SQL parametrizado dentro de los servicios | Pool, transacciones y consultas | PostgreSQL |
+| Tiempo real | `realtime/yjs.js` | WebSocket, ACL de sala, snapshots y emisión de chat | Servicios y `y-websocket` |
+| Transversal | `validation.js`, `errors.js`, `middleware/errorHandler.js` | Validación runtime y formato uniforme de errores | Sin dependencia de Express en el dominio |
+
+No se creó una capa `repositories/` separada. La decisión es deliberada: los servicios concentran consultas parametrizadas y reglas de negocio para evitar una indirección sin valor actual. Si el número de consultas crece, la extracción de repositorios queda aislada por servicio y no afecta a los controladores.
+
+**Principios aplicados:**
+
+- **SRP:** `server.js` solo compone el proceso; `app.js` compone HTTP; `realtime/yjs.js` encapsula la colaboración; `aiService` encapsula Groq.
+- **DIP:** las rutas dependen de funciones de servicio, no de `pg`; la configuración de la base se resuelve en `db.js`.
+- **OCP:** agregar un endpoint implica una ruta y un servicio, sin modificar el bootstrap.
+- **Cohesión alta:** cada servicio agrupa un único agregado (usuario, ACL, diagrama, chat, IA).
+- **Acoplamiento bajo:** el dominio no conoce Express ni el formato HTTP; los errores de negocio se expresan con `AppError`.
+
+#### Race Condition de Yjs
+
+`y-websocket` crea el `Y.Doc` mediante `getYDoc()` y ejecuta `persistence.bindState()` de forma asíncrona. Si `setupWSConnection()` se llamara inmediatamente, el cliente podría enviar su *sync step 1* antes de que el snapshot de PostgreSQL se hubiera aplicado, escribiendo sobre un documento vacío o generando una pérdida de estado.
+
+La solución implementada en `realtime/yjs.js` es una barrera de preparación:
+
+1. `wss.on('connection')` ejecuta `ws.pause()` antes de cualquier `await`.
+2. Se valida el JWT, el rol ACL y la existencia del diagrama.
+3. `ensureDocumentReady()` crea o recupera el `Y.Doc` y espera `ydoc.readyPromise`.
+4. Si la carga del snapshot falla, se cierra con `1011` y no se permite escritura.
+5. Solo entonces se ejecuta `setupWSConnection()` y `ws.resume()`.
+
+Además, `bindState` espera cualquier `writeState` pendiente y `writeState` espera `readyPromise`, evitando que una nueva conexión cargue un snapshot anterior mientras la conexión previa todavía está persistiendo el suyo.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente Yjs
+    participant W as Servidor WebSocket
+    participant A as ACL / PostgreSQL
+    participant D as Y.Doc
+    participant P as Persistencia
+
+    C->>W: connect /diagram-room-id?token=JWT
+    W->>W: ws.pause()
+    W->>A: verificar JWT, rol y diagrama
+    A-->>W: rol autorizado
+    W->>D: getYDoc(room)
+    D->>P: bindState(room)
+    P->>A: SELECT yjs_snapshot
+    A-->>P: snapshot bytea
+    P->>D: Y.applyUpdate(snapshot)
+    D-->>W: readyPromise resuelta
+    W->>W: setupWSConnection()
+    W->>C: ws.resume()
+    C->>D: sync step 1
+    D-->>C: sync step 2
+```
+
+### 1.8.2. Arquitectura del Frontend (Next.js)
+
+El frontend usa **Next.js 16 con App Router**, React 19, React Flow y Yjs Client. La organización separa páginas, componentes de presentación, hooks de aplicación y utilidades puras.
+
+- `app/diagram/[id]/page.tsx` actúa como orquestador de la pantalla: compone Toolbar, Sidebar, ChatPanel, MembersPanel y React Flow.
+- `hooks/useCollaborativeFlow.ts` encapsula `Y.Doc`, `WebsocketProvider`, presencia, chat y mutaciones del grafo.
+- `hooks/useAICommand.ts` controla el comando de texto, voz e imagen.
+- `hooks/useDiagramMembers.ts` encapsula la API de miembros; `MembersPanel` queda como vista.
+- `ChatPanel` y `Toolbar` son componentes controlados por props: no ejecutan fetch ni aplican reglas de negocio.
+- `lib/apiClient.ts` centraliza el token, `API_BASE` y las peticiones autenticadas.
+
+El acoplamiento se controla mediante contratos en `types/diagram.ts` y utilidades puras (`nodesToAST`, `applyMutations`, helpers Yjs). La deuda pendiente es la extracción adicional del orquestador de página en hooks de catálogo, acciones y exportación; se documenta en la sección de limitaciones.
+
+### 1.8.3. Arquitectura de Datos
+
+La persistencia usa **PostgreSQL en Neon** con TLS y un pool acotado (`PG_POOL_MAX`, por defecto 10). El modelo se sectoriza lógicamente en tres esquemas:
+
+| Esquema | Tablas | Responsabilidad |
+|---|---|---|
+| `auth` | `users`, `diagram_acl` | Identidad, credenciales y autorización por diagrama |
+| `core` | `diagrams` | Metadatos del diagrama y snapshot Yjs (`bytea`) |
+| `chat` | `messages` | Historial durable del asistente y del chat colaborativo |
+
+La sectorización reduce el acoplamiento entre identidad, colaboración y conversación. Las operaciones que afectan a más de una tabla usan `withTransaction`:
+
+- creación de diagrama + ACL `OWNER` en una sola transacción;
+- borrado de ACL + diagrama;
+- reemplazo completo de ACL.
+
+El grafo vivo no se normaliza: se serializa con `Y.encodeStateAsUpdate` y se guarda en `core.diagrams.yjs_snapshot`. El chat sí se normaliza en `chat.messages` para consultas, memoria de IA y auditoría. Esta separación evita descomponer un CRDT en filas y preserva sus relojes lógicos.
+
+### 1.8.4. Arquitectura de Despliegue
+
+| Nodo | Plataforma | Responsabilidad | Consideración |
+|---|---|---|---|
+| Frontend | Vercel | Servir Next.js, assets y rutas de la aplicación | Variables `NEXT_PUBLIC_*` |
+| Backend | Railway | Express, WebSocket Yjs, IA y generación ZIP | Requiere proceso persistente y WebSocket |
+| Base de datos | Neon | PostgreSQL administrado con TLS | Pool, respaldos y latencia |
+| IA | Groq | Texto, voz y visión | Dependencia externa con timeout y errores controlados |
+
+```mermaid
+flowchart LR
+    U["Navegador del usuario"] -->|HTTPS| V["Vercel<br/>Next.js 16"]
+    V -->|REST + JWT| R["Railway<br/>Node.js + Express"]
+    U -->|WSS + JWT| R
+    R -->|SQL TLS| N[("Neon PostgreSQL<br/>auth / core / chat")]
+    R -->|HTTPS| G["Groq API<br/>texto / voz / visión"]
+    R -->|ZIP temporal| F["Descarga del backend generado"]
+```
+
+El backend no puede desplegarse como función serverless pura porque mantiene documentos Yjs en memoria y un WebSocket persistente. Por ello Railway es el nodo adecuado. La limitación de escalado horizontal se documenta en la sección 13.
+
+### 1.8.5. Diagrama de Componentes
+
+```mermaid
+flowchart TB
+    subgraph Cliente["Cliente / Navegador"]
+        UI["Next.js App Router<br/>React 19 + React Flow"]
+        HOOKS["Hooks de aplicación<br/>useCollaborativeFlow<br/>useAICommand<br/>useDiagramMembers"]
+        YCLIENT["Y.Doc + WebsocketProvider"]
+    end
+
+    subgraph Vercel["Vercel"]
+        NEXT["Frontend Next.js<br/>/login /dashboard /diagram/:id"]
+    end
+
+    subgraph Railway["Railway"]
+        APP["app.js<br/>Express + CORS + JSON"]
+        ROUTES["routes/<br/>auth · diagrams · acl · ai"]
+        SERVICES["services/<br/>user · acl · diagram · chat · ai"]
+        REALTIME["realtime/yjs.js<br/>ws.pause + readyPromise"]
+        ERRORS["errors.js + errorHandler"]
+        GEN["generator/<br/>Spring Boot + ZIP"]
+    end
+
+    subgraph Neon["Neon PostgreSQL"]
+        AUTH[("auth.users<br/>auth.diagram_acl")]
+        CORE[("core.diagrams<br/>yjs_snapshot bytea")]
+        CHAT[("chat.messages")]
+    end
+
+    GROQ["Groq API"]
+
+    UI --> NEXT
+    HOOKS --> UI
+    YCLIENT <-->|WSS + JWT| REALTIME
+    NEXT -->|REST + JWT| APP
+    APP --> ROUTES
+    ROUTES --> SERVICES
+    ROUTES --> ERRORS
+    SERVICES --> AUTH
+    SERVICES --> CORE
+    SERVICES --> CHAT
+    REALTIME --> CORE
+    REALTIME --> CHAT
+    SERVICES -->|HTTPS| GROQ
+    ROUTES --> GEN
+```
+
+> La sección 1.8 es la vista arquitectónica integrada. Las secciones 5 a 9 conservan el detalle técnico por capa (frontend, backend, datos, IA y despliegue) y deben leerse como descomposición de las vistas 4+1.
+
+### 1.8.6. Vista lógica
+
+La vista lógica describe las abstracciones persistentes y sus relaciones. El diagrama siguiente usa visibilidad UML, tipos y multiplicidades; coincide con las tablas `auth.users`, `auth.diagram_acl`, `auth.access_requests`, `core.diagrams` y `chat.messages`.
+
+```mermaid
+classDiagram
+    class Usuario {
+        -UUID id
+        -String username
+        -String email
+        -String passwordHash
+        -Date createdAt
+        +getId() UUID
+        +getUsername() String
+    }
+
+    class Diagrama {
+        -String id
+        -String name
+        -UUID ownerId
+        -byte[] yjsSnapshot
+        -Date createdAt
+        -Date updatedAt
+        +getId() String
+        +getOwnerId() UUID
+    }
+
+    class ACL {
+        -UUID id
+        -String diagramId
+        -UUID userId
+        -String role
+        -Date grantedAt
+    }
+
+    class ChatMessage {
+        -UUID id
+        -String diagramId
+        -String author
+        -String role
+        -String content
+        -Date createdAt
+    }
+
+    class AccessRequest {
+        -UUID id
+        -String diagramId
+        -UUID requesterId
+        -String status
+        -Date createdAt
+        +isPending() Boolean
+    }
+
+    Usuario "1" --> "0..*" Diagrama : posee
+    Usuario "1" --> "0..*" ACL : participa
+    Diagrama "1" --> "0..*" ACL : concede
+    Diagrama "1" --> "0..*" ChatMessage : contiene
+    Usuario "1" --> "0..*" AccessRequest : solicita
+    Diagrama "1" --> "0..*" AccessRequest : recibe
+```
+
+La separación entre `ChatMessage` y el snapshot Yjs es intencional: el chat se normaliza para memoria y auditoría, mientras el grafo se conserva como CRDT binario. `AccessRequest` formaliza el flujo de aprobación de Fase 3 y mantiene la trazabilidad entre el solicitante y el propietario.
+
+### 1.8.7. Vista de procesos
+
+La vista de procesos modela la concurrencia de dos clientes y la coordinación del backend. Yjs resuelve la convergencia; el servidor WebSocket autentica, sincroniza y persiste snapshots; PostgreSQL conserva el estado durable.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Usuario A
+    participant B as Usuario B
+    participant FA as Frontend A
+    participant FB as Frontend B
+    participant WS as Backend WebSocket
+    participant Y as Y.Doc / CRDT
+    participant DB as PostgreSQL
+
+    A->>FA: mueve nodo Pedido
+    B->>FB: edita atributo total
+    par Edición concurrente
+        FA->>Y: update posición
+        FB->>Y: update atributo
+    end
+    Y->>WS: sync update
+    WS->>Y: aplica y difunde
+    Y-->>FA: estado convergente
+    Y-->>FB: estado convergente
+    WS->>DB: saveSnapshot() con debounce
+```
+
+El servidor no ordena las operaciones del grafo: delega la convergencia al CRDT y usa `ws.pause()` + `readyPromise` para garantizar que el snapshot se cargue antes de aceptar escrituras. El debounce de 2 segundos reduce la presión sobre Neon.
+
+### 1.8.8. Escenarios (casos de uso)
+
+| CU | Escenario | Componentes principales |
+|---|---|---|
+| CU-01 | Autenticarse | `routes/auth.js`, `userService`, `AuthContext` |
+| CU-02 | Gestionar diagramas | `routes/diagrams.js`, `diagramService`, dashboard |
+| CU-03 | Editar colaborativamente | `useCollaborativeFlow`, `realtime/yjs.js` |
+| CU-04 | Gestionar miembros | `MembersPanel`, `useDiagramMembers`, `aclService` |
+| CU-05 | Exportar/importar | `Toolbar`, utilidades JSON/XMI |
+| CU-06 | Interactuar con el Agente IA | `ChatPanel`, `useAICommand`, `aiService` |
+| CU-07 | Generar backend Spring Boot | `routes/ai.js`, `generator/generate.js` |
+| CU-08 | Consultar manual | `HelpModal`, `useHelpModal`, `data/manual.ts` |
+
+Los escenarios conectan las cuatro vistas anteriores: cada caso de uso atraviesa interfaz, procesos, módulos y nodos de despliegue.
+
+### 1.9. Patrón Strategy y Configuración BYOK
+
+El asistente IA soporta dos proveedores intercambiables mediante el patrón **Strategy**:
+
+- **Groq (nube):** API compatible con OpenAI, autenticada con `GROQ_API_KEY`.
+- **Ollama (local):** API compatible con OpenAI en `OLLAMA_URL`, con `OLLAMA_MODEL`.
+
+`aiService.js` resuelve el proveedor por petición (`groq` u `ollama`) sin mutar `process.env`, evitando condiciones de carrera entre usuarios. Si no se envía una preferencia, se usa `AI_PROVIDER` como valor por defecto.
+
+La configuración BYOK se divide deliberadamente en dos planos:
+
+| Dato | Ubicación | Motivo |
+|---|---|---|
+| Proveedor, `ollamaUrl`, `ollamaModel` | `localStorage` del navegador | Son preferencias no secretas y deben persistir entre recargas |
+| `GROQ_API_KEY` | Variables de entorno del backend | Nunca se expone al navegador; evita robo por XSS o inspección del cliente |
+| `JWT_SECRET`, `DATABASE_URL` | Variables de entorno del backend | Secretos de infraestructura |
+
+El modal **Configuración Avanzada de IA** envía `provider`, `ollamaUrl` y `ollamaModel` al endpoint `/api/ai/command`. El backend valida que la URL sea `http://` o `https://` y la usa solo para esa petición. La clave de Groq jamás viaja al frontend: el navegador solo elige el motor y, si aplica, la URL/modelo local.
+
+```mermaid
+flowchart LR
+    UI["ChatPanel<br/>Configuración Avanzada"] --> LS["localStorage<br/>provider · ollamaUrl · ollamaModel"]
+    UI -->|POST /api/ai/command<br/>provider + URL/modelo| API["routes/ai.js"]
+    API --> V["validation.js<br/>http(s), modelo, provider"]
+    V --> S["aiService Strategy"]
+    S -->|groq| G["Groq Cloud<br/>GROQ_API_KEY en servidor"]
+    S -->|ollama| O["Ollama local<br/>URL del usuario"]
+```
+
+### 1.10. Integración con el Ecosistema Local (Service Discovery)
+
+La integración con Ollama incorpora un mecanismo de **Service Discovery** limitado: el frontend no asume qué modelos están instalados; el backend consulta el catálogo del proveedor local y lo devuelve a la interfaz.
+
+Flujo:
+
+1. El usuario escribe la URL base de Ollama en **Configuración Avanzada de IA**.
+2. El frontend llama a `GET /api/ai/ollama-models?url=...`, un endpoint protegido por JWT.
+3. El backend valida la URL con `validateOllamaUrl`: solo `http://` o `https://`, URL parseable, host presente, longitud máxima y sin credenciales embebidas.
+4. Se elimina el sufijo `/v1` de la URL porque `/v1` pertenece a la API OpenAI-compatible; el catálogo nativo de Ollama vive en `/api/tags`.
+5. El backend ejecuta `GET {base}/api/tags`, extrae `models[].name`, elimina duplicados y devuelve un arreglo de strings.
+6. Si `localhost` falla, se intenta `127.0.0.1` como fallback para entornos donde Ollama solo escucha en IPv4.
+7. Si la conexión falla, se devuelve `503` con un mensaje descriptivo; el frontend lo muestra en el modal.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as ChatPanel
+    participant API as routes/ai.js
+    participant V as validation.js
+    participant O as Ollama
+    UI->>API: GET /api/ai/ollama-models?url=... + JWT
+    API->>V: validateOllamaUrl()
+    V-->>API: URL http(s) válida
+    API->>O: GET {base-sin-/v1}/api/tags
+    O-->>API: { models: [{ name }] }
+    API-->>UI: ["llama3.1:8b", "qwen2.5-coder:7b"]
+```
+
+**Prevención de SSRF:** la validación restringe protocolos, rechaza credenciales en la URL y limita el tamaño. El diseño permite explícitamente hosts locales o túneles privados porque el caso de uso es conectar Ollama; por ello la URL debe ser elegida por el usuario y no construirse desde datos no confiables. La petición se ejecuta server-side, con timeout de 7 segundos y sin exponer la respuesta cruda del proveedor.
+
 ## 2. Objetivos arquitectónicos
 
 1. **Colaboración sin conflictos manuales.** Yjs aporta convergencia eventual mediante un CRDT, sin un servidor central que ordene operaciones.

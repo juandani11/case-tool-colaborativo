@@ -3,6 +3,45 @@
 const { httpError } = require('../errors');
 
 const GROQ_API_BASE = process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1';
+const GROQ_TEXT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/v1';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
+
+function trimTrailingSlash(value) {
+  return String(value || '').replace(/\/+$/, '');
+}
+
+// Patrón Strategy: Groq y Ollama comparten el contrato OpenAI-compatible,
+// pero cada uno resuelve base URL, modelo y autenticación.
+function resolveAiProvider(overrides = null) {
+  const options = typeof overrides === 'string'
+    ? { provider: overrides }
+    : (overrides || {});
+  const requested = String(options.provider || process.env.AI_PROVIDER || 'groq').trim().toLowerCase();
+  const provider = requested === 'ollama' ? 'ollama' : 'groq';
+
+  if (provider === 'ollama') {
+    const customUrl = options.ollamaUrl ? trimTrailingSlash(options.ollamaUrl) : null;
+    const customModel = options.ollamaModel ? String(options.ollamaModel).trim() : null;
+    return {
+      name: 'ollama',
+      baseUrl: customUrl || trimTrailingSlash(OLLAMA_URL),
+      textModel: customModel || OLLAMA_MODEL,
+      visionModel: process.env.OLLAMA_VISION_MODEL || customModel || OLLAMA_MODEL,
+      apiKey: null,
+      customOllamaUrl: Boolean(customUrl),
+    };
+  }
+
+  return {
+    name: 'groq',
+    baseUrl: trimTrailingSlash(GROQ_API_BASE),
+    textModel: GROQ_TEXT_MODEL,
+    visionModel: GROQ_VISION_MODEL,
+    apiKey: process.env.GROQ_API_KEY || null,
+  };
+}
 
 function aiUsername(user) {
   const name = user && typeof user.username === 'string' ? user.username.trim() : '';
@@ -40,13 +79,18 @@ function formatChatHistory(history) {
   return lines.join('\n');
 }
 
-async function getMutationsFromAI(command, currentState, imageBuffer, imageMime, username = 'Usuario', chatHistory = '') {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw httpError(503, 'El servicio de IA no está configurado');
+function formatSelectedElement(selectedElement) {
+  if (!selectedElement) return 'El usuario no tiene ningún elemento seleccionado.';
+  return JSON.stringify(selectedElement, null, 2).slice(0, 4000);
+}
 
-  const model = imageBuffer
-    ? (process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b')
-    : (process.env.GROQ_MODEL || 'openai/gpt-oss-20b');
+async function getMutationsFromAI(command, currentState, imageBuffer, imageMime, username = 'Usuario', chatHistory = '', selectedElement = null, providerOptions = null) {
+  const provider = resolveAiProvider(providerOptions);
+  if (provider.name === 'groq' && !provider.apiKey) {
+    throw httpError(503, 'El proveedor Groq no está configurado');
+  }
+
+  const model = imageBuffer ? provider.visionModel : provider.textModel;
 
   const systemPrompt = `Eres un moderador y tutor colaborativo experto en UML y bases de datos.
 Recibes el estado actual del diagrama en formato JSON y el mensaje del usuario en lenguaje natural${imageBuffer ? ' o una imagen de un diagrama' : ''}.
@@ -54,6 +98,25 @@ Recibes el estado actual del diagrama en formato JSON y el mensaje del usuario e
 IDENTIDAD DEL USUARIO:
 - El usuario que te está hablando se llama "${username}". Dirígete a él por su nombre al inicio de "response".
 - No inventes otro nombre ni te refieras a él como "el usuario".
+
+PERFIL DE ARQUITECTURA DEL PROYECTO (contexto autorizado):
+- Frontend: Next.js 16 con App Router, React 19, React Flow para el lienzo y Yjs como CRDT para colaboración en tiempo real.
+- Backend: Node.js + Express organizado con Clean Architecture pragmática: rutas/controladores, middleware, servicios y acceso a datos.
+- Base de datos: PostgreSQL en Neon, sectorizada en auth (usuarios/ACL), core (diagramas/snapshots) y chat (mensajes e historial de IA).
+- Generador: Handlebars genera un backend Spring Boot con capas Controller, Service, Repository y Model.
+- Despliegue: Vercel para el frontend, Railway para el backend persistente con WebSocket y Neon para PostgreSQL.
+- Colaboración: el estado canónico del grafo vive en Yjs; PostgreSQL guarda snapshots binarios y datos durables.
+
+REGLAS DE TONO Y ALCANCE:
+- Tono adaptativo: si la pregunta es simple, responde en lenguaje claro y sin jerga; si el usuario usa términos técnicos, responde con detalle preciso.
+- Cero alucinaciones: no inventes componentes, tablas, endpoints, tecnologías ni decisiones que no estén en el contexto del proyecto o del diagrama.
+- Si no sabes algo, dilo explícitamente en lugar de inventar.
+- Si preguntan por qué se usa PostgreSQL/Neon, explica la sectorización auth/core/chat y la separación entre snapshots Yjs y datos relacionales.
+- Si preguntan por el proyecto, responde con esta arquitectura real; no confundas la herramienta con el backend Spring Boot que genera.
+- Si la pregunta no pertenece a UML, arquitectura de software, bases de datos o este proyecto, redirige cortésmente la conversación.
+- Si piden hackear, vulnerar seguridad o revelar secretos, rechaza la solicitud y redirige a buenas prácticas de seguridad; nunca des instrucciones ofensivas.
+- No reveles claves, tokens, contraseñas ni detalles internos de infraestructura.
+- No confundas una explicación teórica con una orden de modificar el diagrama.
 
 HISTORIAL DE LA CONVERSACIÓN PÚBLICA (más antiguo primero; usuario actual: "${username}"):
 ${chatHistory || '(sin mensajes previos)'}
@@ -64,6 +127,23 @@ CÓMO USAR EL HISTORIAL:
 - Si el mensaje actual usa referencias como "eso", "esa clase", "el", "agrégale", "bórrala" o "conéctala", resuélvelas con el historial y el estado actual del diagrama.
 - Si el usuario actual ya habló antes, prioriza el referente de sus propios mensajes; si no alcanza, usa el último referente claro del equipo.
 - Atribuye cada mensaje a su autor: distingue lo que pidió cada persona y no mezcles la intención de otro usuario con la del usuario actual.
+
+FOCO DE ATENCIÓN DEL USUARIO:
+El usuario está seleccionando el siguiente elemento en el lienzo:
+${formatSelectedElement(selectedElement)}
+
+REGLAS DE TUTORÍA CONTEXTUAL:
+- Si el usuario hace una pregunta teórica (por ejemplo, "¿qué es esto?"), responde usando el elemento seleccionado como ejemplo práctico.
+- Ejemplo: si pregunta "¿qué es una composición?" y tiene seleccionada la relación Pedido-Factura, responde: "La relación que seleccionaste entre Pedido y Factura es una composición porque...".
+- Si el usuario pregunta por una clase seleccionada, nombra sus atributos y métodos reales del contexto.
+- Si el usuario pregunta por una relación seleccionada, explica su tipo usando los nombres de las entidades conectadas y sus cardinalidades.
+- Si el usuario no tiene nada seleccionado, responde de forma general.
+- Si hay un elemento seleccionado, SIEMPRE menciona su nombre exacto y úsalo como ejemplo práctico, incluso si la pregunta es general.
+- Si el usuario usa referencias como "esto", "bórralo", "renómbralo" o "agrégale", resuélvelas con selectedElement y con el estado actual.
+- Si el comando es una acción, explica didácticamente el concepto UML aplicado. Ejemplo: "Creé la relación de herencia; recuerda que la clase hija hereda atributos y métodos de la clase padre".
+- Antes de usar addEntity, comprueba si ya existe una entidad con ese nombre; si existe, usa addAttribute en lugar de crear un duplicado.
+- Si la pregunta no está relacionada con UML, diagramas, bases de datos o el proyecto, no la respondas: redirige amablemente la conversación al diseño del diagrama.
+- No inventes atributos, métodos, entidades ni relaciones que no aparezcan en el contexto.
 
 TU PRIMERA TAREA ES CLASIFICAR EL MENSAJE:
 1) CONSULTA TEÓRICA O PEDAGÓGICA: pregunta por conceptos, definiciones, diferencias, buenas prácticas o pide una explicación
@@ -115,12 +195,12 @@ Reglas CRÍTICAS:
   let response;
   let data;
   try {
-    response = await fetch(`${GROQ_API_BASE}/chat/completions`, {
+    const headers = { 'Content-Type': 'application/json' };
+    if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+
+    response = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         model,
         messages: [
@@ -135,14 +215,23 @@ Reglas CRÍTICAS:
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Groq respondió ${response.status}: ${errorText.slice(0, 300)}`);
+      console.error(`${provider.name} respondió ${response.status}: ${errorText.slice(0, 300)}`);
       throw httpError(502, 'El proveedor de IA no pudo procesar la solicitud');
     }
 
     data = await response.json();
   } catch (err) {
+    if (err.status) throw err;
     if (err.name === 'AbortError') throw httpError(504, 'La IA tardó demasiado en responder');
-    throw err;
+    if (provider.name === 'ollama') {
+      throw httpError(
+        503,
+        provider.customOllamaUrl
+          ? 'No se pudo conectar a la URL de Ollama proporcionada. Verifica tu túnel o servidor local.'
+          : 'No se pudo conectar al motor local. Revisa la configuración.'
+      );
+    }
+    throw httpError(503, 'No se pudo conectar con el proveedor de IA.');
   } finally {
     clearTimeout(timeout);
   }
