@@ -1,51 +1,34 @@
 'use strict';
 
-const MAX_NAME = 120;
-const MAX_TEXT = 4000;
-const MAX_ID = 128;
-const MAX_ENTITIES = 300;
-const MAX_RELATIONSHIPS = 600;
-const MAX_ATTRIBUTES = 100;
-const MAX_MUTATIONS = 200;
-const AI_PROVIDERS = new Set(['groq', 'ollama']);
-
-const RELATIONSHIP_TYPES = new Set([
-  'ASSOCIATION',
-  'AGGREGATION',
-  'COMPOSITION',
-  'INHERITANCE',
-  'ONE_TO_ONE',
-  'ONE_TO_MANY',
-  'MANY_TO_ONE',
-  'MANY_TO_MANY',
-]);
-
-const MUTATION_ACTIONS = new Set([
-  'addEntity',
-  'addAttribute',
-  'removeEntity',
-  'addRelationship',
-  'removeRelationship',
-]);
-
-function isPlainObject(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function stringValue(value, { min = 1, max = MAX_NAME, trim = true } = {}) {
-  if (typeof value !== 'string') return null;
-  const text = trim ? value.trim() : value;
-  if (text.length < min || text.length > max) return null;
-  return text;
-}
-
-function ok(value) {
-  return { ok: true, value };
-}
-
-function fail(error) {
-  return { ok: false, error };
-}
+const {
+  MAX_NAME,
+  MAX_TEXT,
+  MAX_ID,
+  MAX_ENTITIES,
+  MAX_RELATIONSHIPS,
+  MAX_ATTRIBUTES,
+  MAX_MUTATIONS,
+  RELATIONSHIP_TYPES,
+  MUTATION_ACTIONS,
+  isPlainObject,
+  stringValue,
+  ok,
+  fail,
+} = require('./validation/core');
+const {
+  validateAiProvider,
+  validateOllamaUrl,
+  validateOllamaModel,
+} = require('./validation/ai');
+const {
+  validateDiagramId,
+  validateDiagramName,
+  validateSaveDiagramBody,
+} = require('./validation/diagram');
+const {
+  validateRegisterBody,
+  validateLoginBody,
+} = require('./validation/auth');
 
 function validateAttribute(raw) {
   if (!isPlainObject(raw)) return fail('Atributo inválido');
@@ -265,59 +248,6 @@ function validateSelectedElement(raw) {
   return ok(selected);
 }
 
-function validateDiagramId(value) {
-  if (value === undefined || value === null || value === '') return ok('');
-  if (typeof value !== 'string') return fail('diagramId inválido');
-  const id = value.trim();
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) return fail('diagramId inválido');
-  return ok(id);
-}
-
-function validateDiagramName(value, fallback = 'Nuevo diagrama') {
-  if (value === undefined || value === null || value === '') return ok(fallback);
-  const name = stringValue(value, { max: MAX_NAME });
-  if (!name) return fail('El nombre del diagrama es inválido');
-  return ok(name);
-}
-
-function validateAiProvider(value) {
-  if (value === undefined || value === null) return ok(null);
-  if (typeof value !== 'string') return fail('provider debe ser groq u ollama');
-  const provider = value.trim().toLowerCase();
-  if (!AI_PROVIDERS.has(provider)) return fail('provider debe ser groq u ollama');
-  return ok(provider);
-}
-
-function validateOllamaUrl(value) {
-  if (value === undefined || value === null || value === '') return ok(null);
-  if (typeof value !== 'string') return fail('ollamaUrl debe ser una URL http(s) v�lida');
-  const raw = value.trim();
-  if (!raw) return ok(null);
-  if (raw.length > 2048) return fail('ollamaUrl es demasiado larga');
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return fail('ollamaUrl debe usar http o https');
-    }
-    if (!parsed.hostname) return fail('ollamaUrl no tiene host');
-    if (parsed.username || parsed.password) {
-      return fail('ollamaUrl no puede incluir credenciales');
-    }
-  } catch {
-    return fail('ollamaUrl debe ser una URL http(s) v�lida');
-  }
-  return ok(raw.replace(/\/+$/, ''));
-}
-
-function validateOllamaModel(value) {
-  if (value === undefined || value === null || value === '') return ok(null);
-  if (typeof value !== 'string') return fail('ollamaModel inv�lido');
-  const model = value.trim();
-  if (!model) return ok(null);
-  if (model.length > 120) return fail('ollamaModel es demasiado largo');
-  return ok(model);
-}
-
 function validateCommandPayload(body) {
   if (!isPlainObject(body)) return fail('Cuerpo inválido');
   const command = stringValue(body.command, { min: 1, max: MAX_TEXT });
@@ -428,38 +358,6 @@ function validateMutations(raw) {
   }
 
   return ok(mutations);
-}
-
-function validateRegisterBody(body) {
-  if (!isPlainObject(body)) return fail('Cuerpo inválido');
-  const username = stringValue(body.username, { min: 3, max: 50 });
-  const email = stringValue(body.email, { min: 3, max: 254 });
-  const password = stringValue(body.password, { min: 6, max: 200, trim: false });
-  if (!username) return fail('Username inválido');
-  if (!email || !email.includes('@')) return fail('Email inválido');
-  if (!password) return fail('Password inválida');
-  return ok({ username, email, password });
-}
-
-function validateLoginBody(body) {
-  if (!isPlainObject(body)) return fail('Cuerpo inválido');
-  const username = stringValue(body.username, { min: 1, max: 254 });
-  const password = stringValue(body.password, { min: 1, max: 200, trim: false });
-  if (!username || !password) return fail('Credenciales inválidas');
-  return ok({ username, password });
-}
-
-function validateSaveDiagramBody(body) {
-  if (!isPlainObject(body)) return fail('Cuerpo inválido');
-  if (!Array.isArray(body.nodes) || !Array.isArray(body.edges)) {
-    return fail('nodes y edges deben ser arreglos');
-  }
-  if (body.nodes.length > 2000 || body.edges.length > 2000) {
-    return fail('El diagrama supera el tamaño permitido');
-  }
-  const name = validateDiagramName(body.name, '');
-  if (!name.ok) return name;
-  return ok({ name: name.value, nodes: body.nodes, edges: body.edges });
 }
 
 module.exports = {

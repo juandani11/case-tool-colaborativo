@@ -26,6 +26,10 @@ const {
 
 const router = express.Router();
 
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const CLOUD_LOCALHOST_ERROR =
+  'No se puede acceder a localhost desde el servidor en la nube. Si estás en producción, usa una URL pública (ej. Ngrok) o cambia a Groq.';
+
 router.get('/ollama-models', requireAuth, asyncHandler(async (req, res) => {
   const fallbackUrl = process.env.OLLAMA_URL || 'http://localhost:11434/v1';
   const checkedUrl = validateOllamaUrl(req.query.url || fallbackUrl);
@@ -36,6 +40,13 @@ router.get('/ollama-models', requireAuth, asyncHandler(async (req, res) => {
     parsed = new URL(checkedUrl.value);
   } catch {
     throw httpError(400, 'ollamaUrl debe ser una URL http(s) válida');
+  }
+
+  if (
+    process.env.NODE_ENV === 'production'
+    && LOOPBACK_HOSTNAMES.has(parsed.hostname.toLowerCase())
+  ) {
+    throw httpError(400, CLOUD_LOCALHOST_ERROR);
   }
 
   // Ollama sirve /api/tags en la raíz; /v1 solo aplica a su API OpenAI-compatible.

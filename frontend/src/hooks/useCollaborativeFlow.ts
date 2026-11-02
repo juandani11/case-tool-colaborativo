@@ -24,55 +24,16 @@ import {
   removeEdge as yRemoveEdge,
   edgesToArray,
 } from '../utils/yjsEdgeHelpers';
+import {
+  exportDiagramData,
+  importDiagramFile,
+  loadDiagramDataToYjs,
+} from '../utils/yjsDiagramIo';
+import { teardown } from '../utils/yjsTeardown';
+import { buildChatMessage } from '../utils/chatMessage';
 
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'ia' | 'system';
-  // Quién habla (username del JWT). Permite que el chat público muestre el
-  // nombre real de cada participante, no solo "Tú".
-  author?: string;
-  // Identidad estable del emisor (user.id o anon por pestaña). Permite
-  // distinguir los mensajes propios incluso cuando todos se llaman "Anónimo".
-  clientId?: string;
-  text: string;
-  timestamp: number;
-}
-
-// Usuario visible en PresencePanel. clientId = conexion (cambia al
-// reconectar); id = identidad estable (user.id o anon por pestana).
-// Deduplicar SIEMPRE por id, no por clientId (2 pestanas = 1 avatar).
-export interface ConnectedUser {
-  clientId: number;
-  id: string;
-  name: string;
-  color: string;
-}
-
-interface ImportedNode {
-  id: string;
-  position: { x: number; y: number };
-  data: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
-interface ImportedEdge {
-  id: string;
-  source: string;
-  target: string;
-  [key: string]: unknown;
-}
-
-function teardown(
-  provider: WebsocketProvider | null,
-  doc: Y.Doc | null
-) {
-  if (provider) {
-    try { provider.destroy(); } catch {}
-  }
-  if (doc) {
-    try { doc.destroy(); } catch {}
-  }
-}
+import type { ChatMessage, ConnectedUser } from '../types/collaboration';
+export type { ChatMessage, ConnectedUser } from '../types/collaboration';
 
 export function useCollaborativeFlow(roomName: string, enabled = true) {
   const [nodes, setNodes] = useState<any[]>([]);
@@ -356,113 +317,26 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
   }, [addEdge]);
 
   const exportDiagram = useCallback(() => {
-    const data = { nodes: nodesRef.current, edges: edgesRef.current };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'diagrama.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    exportDiagramData(nodesRef.current, edgesRef.current);
   }, []);
 
   const importDiagram = useCallback((file: File) => {
-    const yn = yNodesRef.current;
-    const ye = yEdgesRef.current;
-    if (!yn || !ye) return;
-    const reader = new FileReader();
-    reader.onload = (e: any) => {
-      try {
-        const data = JSON.parse(e.target.result) as { nodes: unknown; edges: unknown };
-        if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
-          alert('Formato JSON inválido: se esperaban arreglos nodes y edges.');
-          return;
-        }
-        const importedNodes = data.nodes as ImportedNode[];
-        const importedEdges = data.edges as ImportedEdge[];
-
-        const nodeIds = new Set<string>();
-        const nodesAreValid = importedNodes.every((node: ImportedNode) => {
-          const valid = node
-            && typeof node.id === 'string'
-            && node.id.length > 0
-            && node.position
-            && typeof node.position.x === 'number'
-            && typeof node.position.y === 'number'
-            && node.data
-            && typeof node.data === 'object'
-            && !nodeIds.has(node.id);
-          if (valid) nodeIds.add(node.id);
-          return valid;
-        });
-        if (!nodesAreValid) {
-          alert('JSON inválido: hay nodos sin id, posición o datos, o ids duplicados.');
-          return;
-        }
-
-        const edgeIds = new Set<string>();
-        const edgesAreValid = importedEdges.every((edge: ImportedEdge) => {
-          const valid = edge
-            && typeof edge.id === 'string'
-            && edge.id.length > 0
-            && !edgeIds.has(edge.id)
-            && typeof edge.source === 'string'
-            && typeof edge.target === 'string'
-            && nodeIds.has(edge.source)
-            && nodeIds.has(edge.target);
-          if (valid) edgeIds.add(edge.id);
-          return valid;
-        });
-        if (!edgesAreValid) {
-          alert('JSON inválido: hay aristas sin id o con extremos inexistentes.');
-          return;
-        }
-
-        // Clear and repopulate in a single Yjs transaction only after validation.
-        docTransact(ydocRef.current, () => {
-          yn.clear();
-          ye.clear();
-          importedNodes.forEach((node) => yAddNode(yn, node));
-          importedEdges.forEach((edge) => yAddEdge(ye, edge));
-        });
-      } catch (error) {
-        alert('Error al importar: ' + (error as Error).message);
-      }
-    };
-    reader.readAsText(file);
+    importDiagramFile(file, {
+      yn: yNodesRef.current,
+      ye: yEdgesRef.current,
+      doc: ydocRef.current,
+    });
   }, []);
 
   /**
    * Load diagram data directly from a parsed JSON object (from server REST API).
    */
   const loadDiagramData = useCallback((data: { nodes: any[]; edges: any[]; chat?: ChatMessage[] }) => {
-    const yn = yNodesRef.current;
-    const ye = yEdgesRef.current;
-    const ychat = ychatRef.current;
-    if (!yn || !ye || !ychat) return;
-    // Siembra por canal: si el grafo ya está vivo (otro peer) no lo tocamos,
-    // pero un chat huérfano (p. ej. mensaje emitido por el backend antes de
-    // que entrara nadie) no debe impedir cargar nodos/aristas desde el REST.
-    const hasGraph = yn.size > 0 || ye.size > 0;
-    const hasChat = ychat.length > 0;
-    if (hasGraph && hasChat) return;
-
-    docTransact(ydocRef.current, () => {
-      if (!hasGraph) {
-        yn.clear();
-        ye.clear();
-        if (Array.isArray(data.nodes)) {
-          data.nodes.forEach((node: any) => yAddNode(yn, node));
-        }
-        if (Array.isArray(data.edges)) {
-          data.edges.forEach((edge: any) => yAddEdge(ye, edge));
-        }
-      }
-      if (!hasChat && Array.isArray(data.chat)) {
-        data.chat.forEach((msg) => ychat.push([msg]));
-      }
+    loadDiagramDataToYjs(data, {
+      yn: yNodesRef.current,
+      ye: yEdgesRef.current,
+      ychat: ychatRef.current,
+      doc: ydocRef.current,
     });
   }, []);
 
@@ -470,25 +344,7 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     (sender: 'user' | 'ia' | 'system', text: string, author?: string) => {
       const ychat = ychatRef.current;
       if (!ychat) return;
-      // El autor de los mensajes de usuario sale de la sesión (JWT), no del
-      // llamador, para que cada peer vea el nombre real de quien preguntó.
-      const resolvedAuthor =
-        author ||
-        (sender === 'user'
-          ? userRef.current?.username || sessionIdentity.current.name || 'Usuario'
-          : sender === 'ia'
-          ? 'IA'
-          : undefined);
-      const msg: ChatMessage = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        sender,
-        author: resolvedAuthor,
-        text,
-        timestamp: Date.now(),
-      };
-      if (sender === 'user') {
-        msg.clientId = userRef.current?.id || sessionIdentity.current.id;
-      }
+      const msg = buildChatMessage(sender, text, author, userRef.current, sessionIdentity.current);
       ychat.push([msg]);
     },
     []
@@ -523,14 +379,4 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     provider,
     providerRef,
   };
-}
-
-/**
- * Run a set of Yjs mutations inside a single transaction.
- * This batches all changes into one update, reducing the number of
- * observer notifications and WebSocket messages.
- */
-function docTransact(doc: Y.Doc | null, fn: () => void) {
-  if (!doc) { fn(); return; }
-  doc.transact(fn);
 }

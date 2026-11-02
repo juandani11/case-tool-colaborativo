@@ -1,75 +1,35 @@
 'use client';
 
-import { useCallback, useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { useAuth } from '../../../contexts/AuthContext';
-import { apiFetch } from '../../../lib/apiClient';
-import { useDiagramRole } from '../../../hooks/useDiagramRole';
+import { useCallback, useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { useDiagramCatalog } from '../../../hooks/useDiagramCatalog';
+import { useDiagramLoader } from '../../../hooks/useDiagramLoader';
+import { useDiagramAccess } from '../../../hooks/useDiagramAccess';
+import { useEditorSelection } from '../../../hooks/useEditorSelection';
+import { useAssociationEditing } from '../../../hooks/useAssociationEditing';
+import { useDiagramIo } from '../../../hooks/useDiagramIo';
+import { useRelationMode } from '../../../hooks/useRelationMode';
+import { useCanvasInteractions } from '../../../hooks/useCanvasInteractions';
+import { usePanelSelection } from '../../../hooks/usePanelSelection';
+import { useEdgeCreation } from '../../../hooks/useEdgeCreation';
 import MembersPanel from '../../../components/MembersPanel';
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  ReactFlowProvider,
-  useReactFlow,
-  Node,
-  OnSelectionChangeParams,
-  Edge,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import EntityNode from '../../../components/EntityNode';
-import InheritanceEdge from '../../../components/InheritanceEdge';
-import AggregationEdge from '../../../components/AggregationEdge';
-import CompositionEdge from '../../../components/CompositionEdge';
-import AssociationEdge from '../../../components/AssociationEdge';
+import { ReactFlowProvider } from 'reactflow';
 import Toolbar from '../../../components/Toolbar';
 import Sidebar from '../../../components/Sidebar';
-import DiagramSelector, { DiagramInfo } from '../../../components/DiagramSelector';
-import EntityEditorPanel from '../../../components/EntityEditorPanel';
-import EdgeEditorPanel from '../../../components/EdgeEditorPanel';
+import DiagramSelector from '../../../components/DiagramSelector';
 import ChatPanel from '../../../components/ChatPanel';
+import EditorFlow from '../../../components/diagram/EditorFlow';
+import EditorAccessStatus from '../../../components/diagram/EditorAccessStatus';
+import EditorPanels from '../../../components/diagram/EditorPanels';
+import AuthGate from '../../../components/diagram/AuthGate';
 // PresencePanel se renderiza dentro de Toolbar, no directamente en page
 import { useCollaborativeFlow } from '../../../hooks/useCollaborativeFlow';
 import { useAICommand } from '../../../hooks/useAICommand';
-import { EntityNodeData, RelationshipData, SelectedElementContext, UmlRelationshipType } from '../../../types/diagram';
+import { UmlRelationshipType } from '../../../types/diagram';
 import { useAiProvider } from '../../../hooks/useAiProvider';
-import { nodesToAST } from '../../../utils/ast';
-import { importFromXmi } from '../../../utils/xmiImporter';
-import { exportToXmi, downloadXmi } from '../../../utils/xmiExporter';
-import { typeMap as relationshipToReactFlow } from '../../../utils/yjsEdgeHelpers';
-import DashedEdge from '../../../components/DashedEdge';
-import SelfLoopEdge from '../../../components/edges/SelfLoopEdge';
-import AssociationClassConnector from '../../../components/AssociationClassConnector';
-import Palette, { RELATIONSHIPS } from '../../../components/Palette';
+import Palette from '../../../components/Palette';
 import { useNodeLocks } from '../../../hooks/useNodeLocks';
-import {
-  AssociationDeletePlan,
-  buildAssociationNode,
-  isAssociationLinkEdge,
-  planAssociationDelete,
-} from '../../../utils/associationClass';
-
-// Registro de renderers: UN nodeType (la variante va en data) y SEIS edgeTypes.
-// `type` es SOLO visual; la semantica UML viaja en data.type (no mezclar).
-const nodeTypes = { entity: EntityNode };
-const edgeTypes = {
-  association: AssociationEdge,
-  inheritance: InheritanceEdge,
-  aggregation: AggregationEdge,
-  composition: CompositionEdge,
-  dashed: DashedEdge,
-  selfloop: SelfLoopEdge,
-};
-
-const DIAGRAMS_STORAGE_KEY = 'uml-editor-diagrams';
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1234';
-
-function humanizeDiagramId(id: string): string {
-  // "diagram-1788128550848" -> "Diagrama 1788128550848"
-  // "diagram-1" -> "Diagrama 1"
-  const num = id.replace(/^diagram-/, '');
-  return `Diagrama ${num}`;
-}
+import { isAssociationLinkEdge } from '../../../utils/associationClass';
 
 // Orquestador del editor: lista de diagramas, rol (VIEWER = read-only),
 // modo conexion de paleta (source -> target, Escape cancela, mismo nodo =
@@ -77,11 +37,17 @@ function humanizeDiagramId(id: string): string {
 // Se monta con key={diagramId}: al navegar se remonta TODO (Yjs, rol, panels)
 // y no se mezclan rooms. La colaboracion real vive en useCollaborativeFlow.
 function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
-  const router = useRouter();
-  const [diagrams, setDiagrams] = useState<DiagramInfo[]>([]);
-  const [currentDiagramId, setCurrentDiagramId] = useState<string | null>(null);
-  const [diagramsLoaded, setDiagramsLoaded] = useState(false);
-  const initializedRef = useRef(false);
+  const {
+    diagrams,
+    currentDiagramId,
+    diagramsLoaded,
+    currentRoom,
+    navigateToDiagram,
+    handleCreateDiagram,
+    handleDeleteDiagram,
+    handleRenameDiagram,
+    updateDiagramName,
+  } = useDiagramCatalog(initialDiagramId);
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -91,170 +57,25 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const { config: aiConfig, setConfig: setAiConfig } = useAiProvider();
-  const [accessRequestState, setAccessRequestState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [accessRequestMessage, setAccessRequestMessage] = useState('');
+  const {
+    authEnabled,
+    user,
+    diagramRole,
+    roleLoading,
+    isViewer,
+    noAccess,
+    accessRequestState,
+    accessRequestMessage,
+    handleRequestAccess,
+  } = useDiagramAccess(currentDiagramId);
 
-  // ── Modo conexion (paleta de relaciones) ─────────────────────────
-  const [activeRelationType, setActiveRelationType] = useState<string | null>(null);
-  const [pendingSource, setPendingSource] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-
-  // Navegar entre diagramas recarga la ruta (el key del padre remonts todo)
-  const navigateToDiagram = useCallback((id: string) => {
-    router.push(`/diagram/${id}`);
-  }, [router]);
-
-  // Step 1: Fetch diagram list from server on mount.
-  // Acepta tanto el formato legacy (array) como el nuevo ({ owned, shared }).
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
-    const lastId = localStorage.getItem('uml-editor-current-diagram');
-
-    apiFetch(`${API_BASE}/api/diagrams`)
-      .then(r => r.json())
-      .then((payload: { id: string; name?: string; updatedAt?: number }[] | { owned?: { id: string; name?: string; updatedAt?: number }[]; shared?: { id: string; name?: string; updatedAt?: number }[] }) => {
-        const serverDiagrams = Array.isArray(payload)
-          ? payload
-          : [...(payload.owned || []), ...(payload.shared || [])];
-        if (serverDiagrams.length === 0) {
-          if (initialDiagramId) {
-            // Link directo a un diagrama aún no creado: abrirlo vacío
-            setDiagrams([{ id: initialDiagramId, name: humanizeDiagramId(initialDiagramId) }]);
-            setCurrentDiagramId(initialDiagramId);
-            setDiagramsLoaded(true);
-            return;
-          }
-          // No diagrams on server — create one atomically (diagram + ACL).
-          apiFetch(`${API_BASE}/api/diagrams`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Diagrama 1' }),
-          })
-            .then(r => r.json())
-            .then((created: { id?: string; name?: string }) => {
-              if (!created?.id) throw new Error('El servidor no devolvió el diagrama creado');
-              const defaultList: DiagramInfo[] = [{ id: created.id, name: created.name || 'Diagrama 1' }];
-              setDiagrams(defaultList);
-              setCurrentDiagramId(created.id);
-              setDiagramsLoaded(true);
-            })
-            .catch(() => {
-              const fallbackList: DiagramInfo[] = [{ id: 'diagram-1', name: 'Diagrama 1' }];
-              setDiagrams(fallbackList);
-              setCurrentDiagramId('diagram-1');
-              setDiagramsLoaded(true);
-            });
-          return;
-        }
-
-        // Build DiagramInfo[] from server IDs
-        const sorted = [...serverDiagrams].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-        const list: DiagramInfo[] = sorted.map(d => ({
-          id: d.id,
-          name: (d as any).name || humanizeDiagramId(d.id),
-        }));
-
-        setDiagrams(list);
-
-        // La URL manda; si no, último abierto; si no, el primero
-        if (initialDiagramId) {
-          setCurrentDiagramId(initialDiagramId);
-          if (!list.some(d => d.id === initialDiagramId)) {
-            setDiagrams(prev => [...prev, { id: initialDiagramId, name: humanizeDiagramId(initialDiagramId) }]);
-          }
-        } else if (lastId && list.some(d => d.id === lastId)) {
-          setCurrentDiagramId(lastId);
-        } else {
-          setCurrentDiagramId(list[0].id);
-        }
-        setDiagramsLoaded(true);
-      })
-      .catch(() => {
-        // Server unavailable — fall back to localStorage
-        try {
-          const stored = localStorage.getItem(DIAGRAMS_STORAGE_KEY);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setDiagrams(parsed);
-              if (initialDiagramId) {
-                setCurrentDiagramId(initialDiagramId);
-              } else {
-                setCurrentDiagramId(lastId && parsed.some((d: DiagramInfo) => d.id === lastId) ? lastId : parsed[0].id);
-              }
-              setDiagramsLoaded(true);
-              return;
-            }
-          }
-        } catch {}
-        // Ultimate fallback
-        const fallbackId = initialDiagramId || 'diagram-1';
-        setDiagrams([{ id: fallbackId, name: humanizeDiagramId(fallbackId) }]);
-        setCurrentDiagramId(fallbackId);
-        setDiagramsLoaded(true);
-      });
-  }, [initialDiagramId]);
-
-  const currentRoom = `diagram-room-${currentDiagramId || 'diagram-1'}`;
-
-  // Persist current diagram selection (client only)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !currentDiagramId) return;
-    localStorage.setItem('uml-editor-current-diagram', currentDiagramId);
-  }, [currentDiagramId]);
-
-  // Persist diagrams list (client only)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(DIAGRAMS_STORAGE_KEY, JSON.stringify(diagrams));
-  }, [diagrams]);
 
   const handleSelectDiagram = useCallback((id: string) => {
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     navigateToDiagram(id);
   }, [navigateToDiagram]);
-
-  const handleCreateDiagram = useCallback(() => {
-    // Crear en el servidor (devuelve id + crea ACL con el usuario como OWNER)
-    apiFetch(`${API_BASE}/api/diagrams`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Nuevo diagrama' }),
-    })
-      .then(r => r.json())
-      .then((data: { id?: string }) => {
-        if (data && data.id) {
-          navigateToDiagram(data.id);
-        }
-      })
-      .catch(() => {});
-  }, [navigateToDiagram]);
-
-  const handleDeleteDiagram = useCallback((id: string) => {
-    const wasCurrent = id === currentDiagramId;
-    // Delete from server
-    apiFetch(`${API_BASE}/api/diagrams/${id}`, { method: 'DELETE' }).catch(() => {});
-
-    setDiagrams(prev => prev.filter(d => d.id !== id));
-
-    if (wasCurrent) {
-      // Volver al dashboard; si no quedaba nada, el dashboard permite crear
-      router.push('/dashboard');
-    }
-  }, [currentDiagramId, router]);
-
-  const handleRenameDiagram = useCallback((id: string, name: string) => {
-    setDiagrams(prev => prev.map(d => d.id === id ? { ...d, name } : d));
-    // Persist to server
-    apiFetch(`${API_BASE}/api/diagrams/${id}/rename`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    }).catch(() => {});
-  }, []);
 
   const {
     nodes,
@@ -282,78 +103,21 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
 
   const nodeLocks = useNodeLocks(provider);
 
-  // Load diagram data from server when switching diagrams (or on first load)
-  useEffect(() => {
-    if (!diagramsLoaded || !currentDiagramId) return;
-    let cancelled = false;
-    apiFetch(`${API_BASE}/api/diagrams/${currentDiagramId}`)
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        if (data.nodes && data.edges) {
-          loadDiagramData({ nodes: data.nodes, edges: data.edges, chat: data.chat });
-        }
-        // Update diagram name from server if available
-        if (data.name) {
-          setDiagrams(prev => prev.map(d => d.id === currentDiagramId ? { ...d, name: data.name } : d));
-        }
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [currentDiagramId, diagramsLoaded, initialDiagramId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useDiagramLoader({
+    currentDiagramId,
+    diagramsLoaded,
+    initialDiagramId,
+    loadDiagramData,
+    updateDiagramName,
+  });
 
-  // El reset de modo conexion no hace falta: el componente se remonta con
-  // key={diagramId} al navegar (ver DiagramPage), así que el estado nace limpio.
-
-  const selectedElementForAI: SelectedElementContext | null = (() => {
-    const node = nodes.find((item) => item.id === selectedNodeId) as Node<EntityNodeData> | undefined;
-    if (node) {
-      return {
-        kind: 'node',
-        id: node.id,
-        name: node.data.label,
-        stereotype: node.data.stereotype,
-        attributes: (node.data.attributes || []).map((attribute) => ({
-          name: attribute.name,
-          type: attribute.type,
-          isPk: attribute.isPk,
-          nullable: attribute.nullable,
-          unique: attribute.unique,
-        })),
-        methods: (node.data.methods || []).map((method) => ({
-          name: method.name,
-          returnType: method.returnType,
-          visibility: method.visibility,
-          parameters: (method.parameters || []).map((parameter) => ({
-            name: parameter.name,
-            type: parameter.type,
-          })),
-        })),
-      };
-    }
-
-    const edge = edges.find((item) => item.id === selectedEdgeId) as Edge<RelationshipData> | undefined;
-    if (!edge) return null;
-
-    const source = nodes.find((item) => item.id === edge.source) as Node<EntityNodeData> | undefined;
-    const target = nodes.find((item) => item.id === edge.target) as Node<EntityNodeData> | undefined;
-    return {
-      kind: 'edge',
-      id: edge.id,
-      type: edge.data?.type || 'ASSOCIATION',
-      source: {
-        id: edge.source,
-        name: source?.data.label || edge.source,
-      },
-      target: {
-        id: edge.target,
-        name: target?.data.label || edge.target,
-      },
-      ...(edge.data?.label ? { label: edge.data.label } : {}),
-      ...(edge.data?.cardinalityFrom ? { cardinalityFrom: edge.data.cardinalityFrom } : {}),
-      ...(edge.data?.cardinalityTo ? { cardinalityTo: edge.data.cardinalityTo } : {}),
-    };
-  })();
+  const {
+    selectedData,
+    duplicateNodeName,
+    selectedEdgeData,
+    selectedNodeAssociationInfo,
+    selectedElementForAI,
+  } = useEditorSelection(nodes, edges, selectedNodeId, selectedEdgeId);
 
   const {
     command,
@@ -380,93 +144,58 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     addMessage,
   });
 
-  const reactFlow = useReactFlow();
+  const {
+    activeRelationType,
+    pendingSource,
+    activeRelationLabel,
+    selectRelationType,
+    cancelRelationMode,
+    onNodeClick,
+  } = useRelationMode(addEdge);
 
-  // ── Palette drag-and-drop ────────────────────────────────────────
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }, []);
+  const {
+    handleSaveNode,
+    handleDeleteSelectedNode,
+    handleDissolveAssociationClass,
+    handleNodesChange,
+    handleConvertToAssociationClass,
+  } = useAssociationEditing({
+    nodes,
+    edges,
+    selectedNodeId,
+    setSelectedNodeId,
+    setSelectedEdgeId,
+    addNode,
+    updateNode,
+    removeNode,
+    updateEdge,
+    removeEdge,
+    onNodesChange,
+  });
 
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const raw = e.dataTransfer.getData('application/reactflow');
-      if (!raw) return;
-      try {
-        const { defaultData } = JSON.parse(raw);
-        const position = reactFlow.screenToFlowPosition({
-          x: e.clientX,
-          y: e.clientY,
-        });
-        const newNode = {
-          id: `entity_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          type: 'entity',
-          position,
-          data: {
-            label: defaultData.label || 'Nueva',
-            attributes: defaultData.attributes || [],
-            methods: defaultData.methods || [],
-            stereotype: defaultData.stereotype || 'class',
-            isAbstract: defaultData.isAbstract,
-            isNote: defaultData.isNote,
-          },
-        };
-        addNode(newNode);
-      } catch {}
-    },
-    [reactFlow, addNode]
-  );
+  const { handleGenerateBackend, handleExportXmi, handleImportXmi } = useDiagramIo({
+    nodes,
+    edges,
+    addNode,
+    addEdge,
+  });
 
-  // Cancelar modo conexion con Escape
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && activeRelationType) {
-        setActiveRelationType(null);
-        setPendingSource(null);
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [activeRelationType]);
+  const { onDragOver, onDrop, handleAddEntity } = useCanvasInteractions(addNode);
 
-  // Rol en el diagrama actual (Fase 2A). Con AUTH_ENABLED=false el
-  // backend devuelve OWNER y todo funciona como antes.
-  const { role: diagramRole, loading: roleLoading } = useDiagramRole(currentDiagramId);
-  const { authEnabled, user } = useAuth();
-  const isViewer = authEnabled && diagramRole === 'VIEWER';
-  const noAccess = authEnabled && !roleLoading && diagramRole === 'NONE';
-
-  const handleRequestAccess = useCallback(async () => {
-    if (!currentDiagramId || accessRequestState === 'sending' || accessRequestState === 'sent') return;
-    setAccessRequestState('sending');
-    setAccessRequestMessage('');
-    try {
-      const res = await apiFetch(
-        `${API_BASE}/api/diagrams/${encodeURIComponent(currentDiagramId)}/request-access`,
-        { method: 'POST' }
-      );
-      if (res.ok) {
-        setAccessRequestState('sent');
-        setAccessRequestMessage('Solicitud enviada. Espera la aprobación del dueño.');
-        return;
-      }
-      const data = await res.json().catch(() => null);
-      const message = typeof data?.error === 'string'
-        ? data.error
-        : 'No se pudo enviar la solicitud.';
-      if (res.status === 409 && message.toLowerCase().includes('pendiente')) {
-        setAccessRequestState('sent');
-        setAccessRequestMessage('Ya tienes una solicitud pendiente. Espera la respuesta del dueño.');
-        return;
-      }
-      setAccessRequestState('error');
-      setAccessRequestMessage(message);
-    } catch {
-      setAccessRequestState('error');
-      setAccessRequestMessage('No se pudo conectar con el servidor.');
-    }
-  }, [currentDiagramId, accessRequestState]);
+  const {
+    handleSelectNodeFromSidebar,
+    handleSelectEdgeFromSidebar,
+    onSelectionChange,
+    onEdgeClick,
+    onPaneClick,
+    handleCloseEntityPanel,
+    handleCloseEdgePanel,
+  } = usePanelSelection({
+    selectedNodeId,
+    setSelectedNodeId,
+    setSelectedEdgeId,
+    isViewer,
+  });
 
   // Responsive: auto-collapse sidebar on small screens
   useEffect(() => {
@@ -480,263 +209,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleSelectNodeFromSidebar = useCallback((nodeId: string) => {
-    if (isViewer) return;
-    setSelectedNodeId(nodeId);
-    setSelectedEdgeId(null);
-    reactFlow.setNodes(nds => nds.map(n => ({ ...n, selected: n.id === nodeId })));
-    reactFlow.setEdges(eds => eds.map(e => ({ ...e, selected: false })));
-  }, [reactFlow, isViewer]);
-
-  const handleSelectEdgeFromSidebar = useCallback((edgeId: string) => {
-    if (isViewer) return;
-    setSelectedEdgeId(edgeId);
-    setSelectedNodeId(null);
-    reactFlow.setNodes(nds => nds.map(n => ({ ...n, selected: false })));
-    reactFlow.setEdges(eds => eds.map(e => ({ ...e, selected: e.id === edgeId })));
-  }, [reactFlow, isViewer]);
-
-  const handleAddEntity = useCallback(() => {
-    const id = `entity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const newNode: Node<EntityNodeData> = {
-      id,
-      type: 'entity',
-      position: { x: Math.random() * 400 + 50, y: Math.random() * 400 + 50 },
-      data: {
-        label: 'NuevaEntidad',
-        attributes: [],
-        methods: [],
-        stereotype: 'class',
-      },
-    };
-    addNode(newNode);
-  }, [addNode]);
-
-  const onSelectionChange = useCallback((params: OnSelectionChangeParams) => {
-    if (params.nodes.length > 0) {
-      setSelectedNodeId(params.nodes[0].id);
-      setSelectedEdgeId(null);
-    }
-  }, []);
-
-  const onEdgeClick = useCallback((_: any, edge: Edge) => {
-    setSelectedEdgeId(edge.id);
-    setSelectedNodeId(null);
-  }, []);
-
-  const onPaneClick = useCallback(() => {
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
-  }, []);
-
-  // ── Click en nodo: modo conexion o seleccion normal ──────────────
-  const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: any) => {
-      if (!activeRelationType) return;
-
-      if (!pendingSource) {
-        setPendingSource(node.id);
-        return;
-      }
-
-      // Crear arista. Si source === target es un self-loop → type='selfloop'.
-      const rel = RELATIONSHIPS.find(r => r.id === activeRelationType);
-      const isSelfLoop = pendingSource === node.id;
-      addEdge({
-        id: `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        source: pendingSource,
-        target: node.id,
-        type: isSelfLoop ? 'selfloop' : activeRelationType,
-        data: {
-          type: rel ? rel.relationshipType : 'ASSOCIATION',
-          cardinalityFrom: '1',
-          cardinalityTo: '1',
-          isSelfLoop,
-        },
-      });
-
-      setPendingSource(null);
-      setActiveRelationType(null);
-    },
-    [activeRelationType, pendingSource, addEdge]
-  );
-
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
-  const selectedData = selectedNode?.data as EntityNodeData | undefined;
-  const selectedLabel = selectedData?.label?.trim().toLocaleLowerCase() || '';
-  const duplicateNodeName = Boolean(selectedNodeId && selectedLabel) && nodes.some(
-    (node) => node.id !== selectedNodeId
-      && (((node.data as EntityNodeData)?.label || '').trim().toLocaleLowerCase() === selectedLabel)
-  );
-
-  const selectedEdge = edges.find((e) => e.id === selectedEdgeId);
-  const selectedEdgeData = selectedEdge?.data as RelationshipData | undefined;
-
-  // Info de clase asociativa para el panel de entidad (nuevo modelo con
-  // stash o legacy con associationClassId en la arista).
-  const selectedNodeAssociationInfo = (() => {
-    if (!selectedNodeId) return null;
-    const stash = (selectedData as any)?.associationOf;
-    if (stash?.sourceId && stash?.targetId) {
-      const from = nodes.find((n: any) => n.id === stash.sourceId)?.data?.label;
-      const to = nodes.find((n: any) => n.id === stash.targetId)?.data?.label;
-      if (from && to) return { fromName: from, toName: to, isLegacy: false };
-    }
-    const legacyEdge: any = edges.find(
-      (e: any) => !isAssociationLinkEdge(e) && e?.data?.associationClassId === selectedNodeId
-    );
-    if (legacyEdge) {
-      const from = nodes.find((n: any) => n.id === legacyEdge.source)?.data?.label;
-      const to = nodes.find((n: any) => n.id === legacyEdge.target)?.data?.label;
-      if (from && to) return { fromName: from, toName: to, isLegacy: true };
-    }
-    return null;
-  })();
-
-  const handleSaveNode = useCallback((id: string, data: EntityNodeData) => {
-    // Fusionar con los datos existentes: el panel no conoce los campos de
-    // clase asociativa (isAssociationClass, associationOf) y no debe borrarlos.
-    const existing: any = nodes.find((n: any) => n.id === id)?.data;
-    updateNode(id, { data: { ...existing, ...data } });
-  }, [updateNode, nodes]);
-
-  // Aplica el plan de borrado/disolución de un nodo asociativo.
-  // La arista original se conserva siempre: solo se limpian vínculos.
-  const applyAssociationDeletePlan = useCallback((plan: AssociationDeletePlan) => {
-    plan.linkIdsToRemove.forEach((linkId: string) => removeEdge(linkId));
-    plan.edgeFieldClears.forEach(({ edgeId, field }: { edgeId: string; field: string }) =>
-      updateEdge(edgeId, { data: { [field]: undefined } })
-    );
-  }, [removeEdge, updateEdge]);
-
-  const handleDeleteSelectedNode = useCallback(() => {
-    if (selectedNodeId) {
-      applyAssociationDeletePlan(planAssociationDelete(nodes, edges, selectedNodeId));
-      removeNode(selectedNodeId);
-      setSelectedNodeId(null);
-    }
-  }, [selectedNodeId, removeNode, nodes, edges, applyAssociationDeletePlan]);
-
-  // Disolver desde el panel del nodo (caso B2-D): limpia el vínculo en la
-  // arista (que queda * a * normal) y elimina el nodo asociativo.
-  const handleDissolveAssociationClass = useCallback((nodeId: string) => {
-    const node: any = nodes.find((n: any) => n.id === nodeId);
-    if (!node) return;
-    applyAssociationDeletePlan(planAssociationDelete(nodes, edges, nodeId));
-    removeNode(nodeId);
-    setSelectedNodeId(null);
-  }, [nodes, edges, applyAssociationDeletePlan, removeNode]);
-
-  // Borrado por teclado (Supr/Backspace): misma cascada que el botón.
-  // Se planifica con el estado previo y luego se delega al hook.
-  const handleNodesChange = useCallback((changes: any[]) => {
-    (changes || [])
-      .filter((c: any) => c.type === 'remove' && c.id)
-      .forEach((c: any) => {
-        applyAssociationDeletePlan(planAssociationDelete(nodes, edges, c.id));
-      });
-    onNodesChange(changes);
-  }, [nodes, edges, applyAssociationDeletePlan, onNodesChange]);
-
-  // Bloque 2: la arista * a * SE CONSERVA y apunta al nodo
-  // (edge.data.associationClassNodeId). El overlay AssociationClassConnector
-  // dibuja la línea punteada al punto medio. Sin aristas punteadas reales.
-  const handleConvertToAssociationClass = useCallback((edgeId: string) => {
-    const edge: any = edges.find((e: any) => e.id === edgeId);
-    if (!edge) return;
-    if (edge.data?.associationClassNodeId || edge.data?.associationClassId) return;
-    if (isAssociationLinkEdge(edge)) return;
-    const fromNode = nodes.find((n: any) => n.id === edge.source);
-    const toNode = nodes.find((n: any) => n.id === edge.target);
-    if (!fromNode || !toNode) return;
-    const assocNode = buildAssociationNode(fromNode, toNode, edge);
-    addNode(assocNode);
-    updateEdge(edgeId, { data: { associationClassNodeId: assocNode.id } });
-    // Seleccionar el nuevo nodo para editarlo inmediatamente
-    setSelectedEdgeId(null);
-    setSelectedNodeId(assocNode.id);
-  }, [edges, nodes, addNode, updateEdge]);
-
-  const handleGenerateBackend = useCallback(async () => {
-    try {
-      const ast = nodesToAST(nodes, edges);
-      const response = await apiFetch(`${API_BASE}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentState: ast }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        const message = errorData?.error || 'Error al generar el backend';
-        throw new Error(message);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'backend-generado.zip';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      console.error(error);
-      alert('Error generando backend: ' + error.message);
-    }
-  }, [nodes, edges]);
-
-  const handleExportXmi = useCallback(() => {
-    // Las aristas punteadas son internas del editor: no se exportan.
-    const xmiContent = exportToXmi(nodes, edges.filter((e: any) => !isAssociationLinkEdge(e)));
-    downloadXmi(xmiContent, 'diagrama.xmi');
-  }, [nodes, edges]);
-
-  const handleOnConnect = useCallback((connection: any) => {
-    let edgeType = 'association';
-    let relationshipType: RelationshipData['type'] = 'ASSOCIATION';
-
-    if (connectionType === 'INHERITANCE') {
-      edgeType = 'inheritance';
-      relationshipType = 'INHERITANCE';
-    } else if (connectionType === 'AGGREGATION') {
-      edgeType = 'aggregation';
-      relationshipType = 'AGGREGATION';
-    } else if (connectionType === 'COMPOSITION') {
-      edgeType = 'composition';
-      relationshipType = 'COMPOSITION';
-    }
-
-    const isSelfLoop = connection.source === connection.target;
-    const newEdge = {
-      id: `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      source: connection.source,
-      target: connection.target,
-      type: isSelfLoop ? 'selfloop' : edgeType,
-      data: {
-        type: relationshipType,
-        cardinalityFrom: '1',
-        cardinalityTo: '1',
-        isSelfLoop,
-      },
-    };
-    addEdge(newEdge);
-  }, [addEdge, connectionType]);
-
-  const handleCloseEntityPanel = useCallback(() => {
-    setSelectedNodeId(null);
-    reactFlow.setNodes(nds => nds.map(n => ({ ...n, selected: false })));
-  }, [reactFlow]);
-
-  const handleCloseEdgePanel = useCallback(() => {
-    setSelectedEdgeId(null);
-    reactFlow.setEdges(eds => eds.map(e => ({ ...e, selected: false })));
-  }, [reactFlow]);
-
-  const handleImportXmi = useCallback((file: File) => {
-    importFromXmi(file, { addNode, addEdge }).catch((error) => {
-      console.error('Error al importar XMI:', error);
-    });
-  }, [addNode, addEdge]);
+  const handleOnConnect = useEdgeCreation(connectionType, addEdge);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-100 overflow-hidden">
@@ -788,15 +261,11 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
         {!isViewer && (
           <Palette
             activeRelationType={activeRelationType}
-            onSelectRelationType={(type) => {
-              setActiveRelationType(type);
-              setPendingSource(null);
-            }}
+            onSelectRelationType={selectRelationType}
             collapsed={paletteCollapsed}
             onToggleCollapse={() => {
               setPaletteCollapsed(true);
-              setActiveRelationType(null);
-              setPendingSource(null);
+              cancelRelationMode();
             }}
           />
         )}
@@ -817,117 +286,32 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
             </button>
           )}
 
-          {/* Floating Entity Editor Panel */}
-          {selectedNodeId && selectedData && (
-            <div className="absolute right-4 top-4 z-30 flex flex-col gap-2">
-              <EntityEditorPanel
-                nodeId={selectedNodeId}
-                initialData={selectedData}
-                onSave={handleSaveNode}
-                onClose={handleCloseEntityPanel}
-                associationInfo={selectedNodeAssociationInfo}
-                onDissolveAssociation={() => handleDissolveAssociationClass(selectedNodeId)}
-                duplicateName={duplicateNodeName}
-              />
-              <button
-                onClick={handleDeleteSelectedNode}
-                className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-xl border border-red-200 transition-colors"
-              >
-                Eliminar entidad
-              </button>
-            </div>
-          )}
+          <EditorPanels
+            nodes={nodes}
+            selectedNodeId={selectedNodeId}
+            selectedData={selectedData}
+            selectedEdgeId={selectedEdgeId}
+            selectedEdgeData={selectedEdgeData}
+            associationInfo={selectedNodeAssociationInfo}
+            duplicateName={duplicateNodeName}
+            onSaveNode={handleSaveNode}
+            onDeleteNode={handleDeleteSelectedNode}
+            onDissolveAssociation={() => selectedNodeId && handleDissolveAssociationClass(selectedNodeId)}
+            onCloseEntity={handleCloseEntityPanel}
+            onCloseEdge={handleCloseEdgePanel}
+            onUpdateEdge={updateEdge}
+            onConvertToAssociationClass={() => selectedEdgeId && handleConvertToAssociationClass(selectedEdgeId)}
+          />
 
-          {/* Floating Edge Editor Panel */}
-          {selectedEdgeId && selectedEdgeData && (
-            <div className="absolute right-4 top-4 z-30">
-              <EdgeEditorPanel
-                key={selectedEdgeId}
-                edgeId={selectedEdgeId}
-                initialData={{
-                  type: (['ASSOCIATION', 'AGGREGATION', 'COMPOSITION', 'INHERITANCE'].includes(
-                    selectedEdgeData.type || ''
-                  )
-                    ? selectedEdgeData.type
-                    : 'ASSOCIATION') as UmlRelationshipType,
-                  cardinalityFrom: selectedEdgeData.cardinalityFrom || '1',
-                  cardinalityTo: selectedEdgeData.cardinalityTo || '1',
-                }}
-                onSave={(data) => {
-                  const reactFlowEdgeType = relationshipToReactFlow[data.type] || 'association';
-                  updateEdge(selectedEdgeId, {
-                    type: reactFlowEdgeType,
-                    cardinalityFrom: data.cardinalityFrom,
-                    cardinalityTo: data.cardinalityTo,
-                    data: {
-                      type: data.type,
-                      cardinalityFrom: data.cardinalityFrom,
-                      cardinalityTo: data.cardinalityTo,
-                      // Preservar el vínculo a clase asociativa (si existe)
-                      associationClassId: selectedEdgeData.associationClassId,
-                    },
-                  });
-                }}
-                associationClassName={
-                  selectedEdgeData.associationClassId
-                    ? nodes.find((n: any) => n.id === selectedEdgeData.associationClassId)?.data?.label || null
-                    : null
-                }
-                onConvertToAssociationClass={() => handleConvertToAssociationClass(selectedEdgeId)}
-                onClose={handleCloseEdgePanel}
-              />
-            </div>
-          )}
-
-          {/* Muro de acceso + badges de rol (Fase 2A, solo con auth activo) */}
-          {noAccess && (
-            <div className="absolute inset-0 z-40 bg-gray-100/95 flex items-center justify-center">
-              <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-8 max-w-sm text-center space-y-3">
-                <h2 className="font-bold text-gray-800">No tienes acceso a este diagrama</h2>
-                <p className="text-sm text-gray-500">
-                  Envía una solicitud al propietario para que te conceda acceso como lector o editor.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleRequestAccess}
-                  disabled={accessRequestState === 'sending' || accessRequestState === 'sent'}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  {accessRequestState === 'sending'
-                    ? 'Enviando solicitud...'
-                    : accessRequestState === 'sent'
-                    ? 'Solicitud enviada'
-                    : 'Solicitar Acceso'}
-                </button>
-                {accessRequestMessage && (
-                  <p
-                    className={`text-xs rounded-md px-3 py-2 ${
-                      accessRequestState === 'error'
-                        ? 'bg-red-50 text-red-700 border border-red-200'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    }`}
-                  >
-                    {accessRequestMessage}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-          {authEnabled && !noAccess && !roleLoading && diagramRole !== 'NONE' && (
-            <div className="absolute left-3 bottom-3 z-30 flex items-center gap-2">
-              <span
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
-                  diagramRole === 'OWNER'
-                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : diagramRole === 'EDITOR'
-                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                    : 'bg-gray-100 text-gray-600 border-gray-200'
-                }`}
-              >
-                {diagramRole === 'OWNER' ? 'Owner' : diagramRole === 'EDITOR' ? 'Editor' : 'Solo lectura'}
-              </span>
-            </div>
-          )}
+          <EditorAccessStatus
+            authEnabled={authEnabled}
+            diagramRole={diagramRole}
+            roleLoading={roleLoading}
+            noAccess={noAccess}
+            accessRequestState={accessRequestState}
+            accessRequestMessage={accessRequestMessage}
+            onRequestAccess={handleRequestAccess}
+          />
 
           {/* Panel de miembros (solo OWNER) */}
           {isMembersOpen && authEnabled && diagramRole === 'OWNER' && currentDiagramId && (
@@ -945,11 +329,11 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-blue-50 border border-blue-300 rounded-lg px-4 py-2 shadow-md flex items-center gap-3">
               <span className="text-sm text-blue-800">
                 {!pendingSource
-                  ? `Modo: ${RELATIONSHIPS.find(r => r.id === activeRelationType)?.label}. Click en el nodo origen.`
+                  ? `Modo: ${activeRelationLabel}. Click en el nodo origen.`
                   : `Click en el destino (o en el mismo nodo para self-loop).`}
               </span>
               <button
-                onClick={() => { setActiveRelationType(null); setPendingSource(null); }}
+                onClick={cancelRelationMode}
                 className="text-sm text-blue-700 hover:underline font-medium"
               >
                 Cancelar (Esc)
@@ -957,63 +341,28 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
             </div>
           )}
 
-          <div className={`w-full h-full ${activeRelationType ? 'cursor-crosshair' : ''}`}>
-          <ReactFlow
-            nodes={nodes.map(n => {
-              const lock = nodeLocks.get(n.id);
-              const isOwnLock = lock && user && connectedUsers.some(
-                u => u.id === user.id && u.name === lock.name
-              );
-              const isPendingSource = pendingSource === n.id;
-              return {
-                ...n,
-                draggable: isViewer ? false : !lock || !!isOwnLock,
-                style: {
-                  ...(lock ? { boxShadow: `0 0 0 3px ${lock.color}` } : {}),
-                  ...(isPendingSource ? { boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.5)' } : {}),
-                  ...(isConnecting && !isPendingSource ? {
-                    outline: '2px dashed #60a5fa',
-                    outlineOffset: '4px',
-                  } : {}),
-                },
-                data: { ...n.data, lockedBy: lock || undefined },
-              };
-            })}
+          <EditorFlow
+            nodes={nodes}
             edges={edges}
+            nodeLocks={nodeLocks}
+            user={user}
+            connectedUsers={connectedUsers}
+            isViewer={isViewer}
+            pendingSource={pendingSource}
+            isConnecting={isConnecting}
+            activeRelationType={activeRelationType}
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
-            onConnect={isViewer ? undefined : handleOnConnect}
+            onConnect={handleOnConnect}
             onConnectStart={() => setIsConnecting(true)}
             onConnectEnd={() => setIsConnecting(false)}
-            onNodeClick={isViewer ? undefined : onNodeClick}
+            onNodeClick={onNodeClick}
             onNodeDragStop={onNodeDragStop}
-            onSelectionChange={isViewer ? undefined : onSelectionChange}
-            onEdgeClick={isViewer ? undefined : onEdgeClick}
+            onSelectionChange={onSelectionChange}
+            onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            nodesDraggable={!isViewer}
-            nodesConnectable={!isViewer}
-            elementsSelectable={!isViewer}
-            connectionRadius={40}
-            deleteKeyCode={isViewer ? [] : ['Backspace', 'Delete']}
-            defaultEdgeOptions={{ type: 'association', style: { strokeWidth: 2 } }}
-            fitView
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background color="#e5e7eb" gap={20} size={1} />
-            <Controls className="!bg-white !border-gray-200 !shadow-md !rounded-lg" />
-            <MiniMap
-              className="!bg-gray-50 !border-gray-200 !shadow-md !rounded-lg"
-              nodeColor="#94a3b8"
-              maskColor="rgba(0,0,0,0.05)"
-            />
-            {/* Bloque 2: línea punteada nodo -> punto medio de la arista */}
-            <AssociationClassConnector />
-          </ReactFlow>
-          </div>
+          />
         </div>
-
         <ChatPanel
           messages={messages}
           command={command}
@@ -1033,27 +382,6 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
       </div>
     </div>
   );
-}
-
-function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, loading, authEnabled } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && authEnabled && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, authEnabled, router]);
-
-  if (loading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center text-gray-500">
-        Cargando...
-      </div>
-    );
-  }
-  if (authEnabled && !user) return null;
-  return <>{children}</>;
 }
 
 export default function DiagramPage() {
