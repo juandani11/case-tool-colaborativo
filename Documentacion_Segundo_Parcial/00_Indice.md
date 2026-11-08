@@ -2,71 +2,70 @@
 
 > **Proyecto:** Herramienta CASE Colaborativa con IA
 > **Documento:** Ingeniería de software del Segundo Parcial
-> **Versión:** 1.1 (entrega final)
-> **Fecha:** 1 de noviembre de 2026
+> **Versión:** 3.0 (entrega final C4 + PUDS)
+> **Fecha:** 3 de noviembre de 2026
 > **Repositorio:** `case-tool`
-> **Alcance:** arquitectura, proceso de desarrollo, análisis, diseño e implementación del asistente IA colaborativo con identidad y memoria contextual, y de la persistencia sectorizada en PostgreSQL.
+> **Alcance:** requisitos, análisis, arquitectura Clean, diseño UML, implementación, pruebas y anexos del asistente IA colaborativo con identidad y memoria contextual.
 
 ## 1. Propósito del vault
 
-Este vault concentra la documentación técnica y académica del Segundo Parcial. Su contenido está organizado para poder leerse de forma lineal, como un informe de ingeniería de software, o de forma navegable mediante enlaces de Obsidian.
+Este vault concentra la documentación técnica y académica del Segundo Parcial. Su contenido está organizado siguiendo el orden lógico de PUDS/RUP: requisitos y proceso, análisis, arquitectura, diseño UML, implementación/pruebas y anexos.
 
 La documentación describe el sistema **realmente implementado**, no una propuesta teórica. Cuando una decisión queda pendiente o una limitación es conocida, se indica explícitamente para evitar ambigüedad entre el estado actual y el trabajo futuro.
+
+## Metodología Aplicada
+
+La bóveda combina dos estándares complementarios:
+
+- **PUDS/RUP:** organiza el ciclo de vida en Inicio, Elaboración, Construcción y Transición, con los hitos **LCO, LAM, IOC y PRM**. Los requisitos, el análisis, la arquitectura, el diseño UML, la implementación/pruebas y los anexos quedan trazados a esas fases.
+- **Modelo C4:** documenta la arquitectura en cuatro niveles: **Contexto**, **Contenedores**, **Componentes** y **Código/Clases**. El nivel 3 refleja Clean Architecture y el nivel 4 se apoya en los diagramas UML de clases.
+
+Los diagramas se escriben en Mermaid para que sean versionables y renderizables en Obsidian. Los estereotipos UML 2.5 (`<<boundary>>`, `<<control>>`, `<<entity>>`, `<<component>>`) se usan cuando aportan semántica.
 
 ## 2. Navegación
 
 | Sección | Documento | Contenido principal |
 |---|---|---|
-| 0 | [[00_Indice]] | Alcance, navegación, correspondencia con el documento Word y exportación |
-| 1 | [[01_Arquitectura]] | Visión general, stack, componentes, despliegue, seguridad y decisiones arquitectónicas |
-| 2 | [[02_Proceso]] | Proceso Unificado, actores, requisitos, ocho casos de uso, iteraciones y CU-06 detallado |
-| 3 | [[03_Analisis]] | Modelo conceptual, paquetes, análisis BCE, contratos y trazabilidad |
-| 4 | [[04_Diseno]] | Diagramas de despliegue, clases, modelo relacional, Rumbaugh, secuencias y estados |
-| 5 | [[05_Implementacion]] | Organización del código, capas del backend, CU-06, pruebas, despliegue y limitaciones |
-| 6 | [[06_Trazabilidad]] | Matriz CU → UI → endpoint → tabla → prueba QA |
-| 7 | [[07_Despliegue]] | Guía DevOps para Vercel, Railway, Neon, Ollama y Ngrok |
-| 8 | [[08_Manual_Usuario]] | Manual rápido para registro, edición, colaboración, IA y generación |
-| 9 | [[09_Conclusiones]] | Conclusiones y trabajo futuro |
-| 10 | [[10_Anexos]] | Glosario técnico y bibliografía APA 7 |
+| 0 | [[00_Indice]] | Alcance, navegación, correspondencia con el informe y exportación |
+| 1 | [[01_Requisitos_y_Proceso]] | PUDS, actores, requisitos, ocho CU, `<<include>>`/`<<extend>>`, UAT y CU-06 |
+| 2 | [[02_Analisis]] | Modelo conceptual, paquetes, BCE, actividad de generación, contratos y trazabilidad |
+| 3 | [[03_Diseno_Arquitectura]] | Clean Architecture, C4 niveles 1–3, monolito modular, Strategy, datos y seguridad |
+| 4 | [[04_Diseno_UML]] | Casos de uso, clases, paquetes, componentes, despliegue, secuencia, actividad, estados y comunicación |
+| 5 | [[05_Implementacion_y_Pruebas]] | Capas, seis iteraciones de construcción, V&V, refactorización, QA y limitaciones |
+| 6 | [[06_Anexos_y_Glosario]] | Trazabilidad, manual de despliegue, manual de usuario, conclusiones, glosario y bibliografía |
 
 ## 3. Resumen ejecutivo
 
 La herramienta permite construir diagramas UML de forma colaborativa en tiempo real, autenticar usuarios, administrar permisos por diagrama y generar un backend Spring Boot con PostgreSQL a partir del modelo. El Segundo Parcial incorpora dos cambios estructurales:
 
 1. **Asistente IA con identidad y memoria contextual.** La identidad se obtiene del JWT y no del cuerpo de la petición. La memoria conversacional se recupera desde PostgreSQL, con los últimos 15 mensajes del diagrama, y la respuesta se persiste y se emite por el chat colaborativo Yjs.
-2. **Persistencia en PostgreSQL sectorizado.** Se reemplazó la persistencia basada en archivos JSON por el esquema `auth`, `core` y `chat` en Neon. El grafo vivo continúa en Yjs; su estado binario se guarda en `core.diagrams.yjs_snapshot`.
+2. **Persistencia en PostgreSQL sectorizado.** Se reemplazó la persistencia basada en archivos JSON por los esquemas `auth`, `core` y `chat` en Neon. El grafo vivo continúa en Yjs; su estado binario se guarda en `core.diagrams.yjs_snapshot`.
 
-La arquitectura resultante combina un frontend Next.js, un backend Express con WebSocket, una base PostgreSQL y servicios externos de IA. Esta combinación permite colaboración en tiempo real sin sacrificar durabilidad, autorización ni trazabilidad de las conversaciones.
+La arquitectura resultante aplica **Clean Architecture en capas**: `routes/` → `middleware/` → `services/` → `db.js` → PostgreSQL. El backend es un único proceso Node que sirve REST y WebSocket, pero su código mantiene separación estricta de responsabilidades y dependencias dirigidas hacia el dominio y la persistencia.
 
-## 4. Correspondencia con el documento Word
-
-El orden de este vault replica el índice lógico del informe:
+## 4. Correspondencia con el informe
 
 | Bloques del informe | Archivo |
 |---|---|
 | Índice, introducción, alcance y resumen | [[00_Indice]] |
-| Arquitectura del sistema | [[01_Arquitectura]] |
-| Proceso de desarrollo, requisitos y casos de uso | [[02_Proceso]] |
-| Análisis de requisitos y modelo BCE | [[03_Analisis]] |
-| Diseño arquitectónico, de clases, de datos y de secuencias | [[04_Diseno]] |
-| Implementación, pruebas, despliegue y conclusiones | [[05_Implementacion]] |
-| Trazabilidad formal | [[06_Trazabilidad]] |
-| Guía de despliegue | [[07_Despliegue]] |
-| Manual de usuario | [[08_Manual_Usuario]] |
-| Conclusiones y trabajo futuro | [[09_Conclusiones]] |
-| Glosario y bibliografía | [[10_Anexos]] |
+| Proceso de desarrollo, requisitos y casos de uso | [[01_Requisitos_y_Proceso]] |
+| Análisis de requisitos y modelo BCE | [[02_Analisis]] |
+| Arquitectura Clean, componentes y decisiones | [[03_Diseno_Arquitectura]] |
+| Diseño UML: clases, secuencia, comunicación, actividad, estados, componentes y despliegue | [[04_Diseno_UML]] |
+| Implementación, refactorización, pruebas y QA | [[05_Implementacion_y_Pruebas]] |
+| Trazabilidad, despliegue, manual, conclusiones, glosario y bibliografía | [[06_Anexos_y_Glosario]] |
 
 ## 5. Alcance documentado
 
 ### 5.1 Incluido
 
-- Arquitectura de frontend, backend, base de datos y despliegue.
+- Arquitectura Clean del backend por capas y separación frontend, backend e IA.
 - Ocho casos de uso del sistema, con énfasis en `CU-06 Usar asistente IA`.
 - Proceso Unificado de Desarrollo de Software y sus fases.
 - Análisis de paquetes y diagramas de frontera-control-entidad.
 - Modelo relacional de los esquemas `auth`, `core` y `chat`.
 - Aplicación de las reglas de transformación de Rumbaugh.
-- Diagramas de secuencia del asistente IA y de la colaboración.
+- Diagramas UML de casos de uso, clases, secuencia, comunicación, actividad, estados, componentes y despliegue.
 - Implementación real, pruebas ejecutadas y limitaciones conocidas.
 - Solicitudes de acceso de Fase 3 y aprobación transaccional.
 - Configuración dinámica de IA Groq/Ollama y auto-detección de modelos.
@@ -126,24 +125,26 @@ Obsidian no exporta `.docx` de forma nativa. Opciones recomendadas:
 1. Portada.
 2. Índice general.
 3. Introducción y resumen ejecutivo.
-4. Arquitectura.
-5. Proceso.
-6. Análisis.
-7. Diseño.
-8. Implementación.
+4. Requisitos y proceso.
+5. Análisis.
+6. Arquitectura.
+7. Diseño UML.
+8. Implementación y pruebas.
 9. Conclusiones y trabajo futuro.
-10. Anexos: contratos API, modelo de datos y trazabilidad.
+10. Anexos: trazabilidad, despliegue, manual, glosario y bibliografía.
 
 ## 9. Estado de la documentación
 
 | Elemento | Estado |
 |---|---|
-| Arquitectura 4+1 | Documentada con vistas lógica, procesos, implementación, despliegue y casos de uso |
-| Proceso PUDS | Documentado con seis iteraciones: IA, concurrencia, acceso y configuración |
+| Clean Architecture | Documentada con capas `routes/` → `middleware/` → `services/` → `db.js` → PostgreSQL |
+| Modelo C4 | Niveles 1–3 documentados en arquitectura; nivel 4 en clases UML |
+| Proceso PUDS | Cuatro fases con hitos LCO/LAM/IOC/PRM y seis iteraciones de construcción |
 | Casos de uso UML | Documentados con actores, flujos y diagramas Mermaid |
-| Análisis BCE | Documentado con frontera, control y entidad |
+| Análisis BCE | Documentado con frontera, control, servicio y entidad |
 | Diseño de datos y Rumbaugh | Documentado con ERD y coincidencia con el esquema real |
-| Implementación y refactorización | Documentada con P0/P1 y trazas de código |
+| UML 2.5 | Casos de uso, clases, secuencia, comunicación, actividad, estados, componentes y despliegue |
+| Implementación y refactorización | Documentada con P0/P1, regla de dependencia y trazas de código |
 | Fase 3: solicitudes de acceso | Documentada con endpoints, tabla `auth.access_requests` y aprobación transaccional |
 | Configuración IA Groq/Ollama | Documentada con Strategy, BYOK y persistencia local de URL/modelo |
 | Dashboard UI/UX | Documentado con CRUD de tarjetas, fechas y empty states |
@@ -152,16 +153,12 @@ Obsidian no exporta `.docx` de forma nativa. Opciones recomendadas:
 
 ## 10. Enlaces de continuidad
 
-- Comenzar la lectura técnica en [[01_Arquitectura]].
-- Revisar el proceso y los casos de uso en [[02_Proceso]].
-- Estudiar el análisis del asistente IA en [[03_Analisis]].
-- Consultar el modelo relacional y las secuencias en [[04_Diseno]].
-- Verificar la implementación y las pruebas en [[05_Implementacion]].
-- Consultar la matriz formal en [[06_Trazabilidad]].
-- Reproducir el entorno con [[07_Despliegue]].
-- Seguir la demo con [[08_Manual_Usuario]].
-- Revisar el cierre en [[09_Conclusiones]].
-- Consultar definiciones y referencias en [[10_Anexos]].
+- Comenzar por requisitos y proceso en [[01_Requisitos_y_Proceso]].
+- Estudiar el análisis BCE en [[02_Analisis]].
+- Revisar Clean Architecture en [[03_Diseno_Arquitectura]].
+- Consultar los diagramas UML en [[04_Diseno_UML]].
+- Verificar la implementación y las pruebas en [[05_Implementacion_y_Pruebas]].
+- Consultar trazabilidad, despliegue, manual y glosario en [[06_Anexos_y_Glosario]].
 
 ## 11. Matriz de Trazabilidad
 

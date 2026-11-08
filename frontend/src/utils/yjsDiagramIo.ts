@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { addNode as yAddNode } from './yjsNodeHelpers';
+import { dedupeChatMessages } from './chatMessage';
 import { addEdge as yAddEdge } from './yjsEdgeHelpers';
 
 interface ImportedNode {
@@ -128,7 +129,15 @@ export function loadDiagramDataToYjs(
       }
     }
     if (!hasChat && Array.isArray(data.chat)) {
-      data.chat.forEach((msg) => ychat.push([msg]));
+      // Merge idempotente: no reinsertar mensajes que otro cliente ya
+      // hidrato desde PostgreSQL (ids `db_*`) en esta misma Y.Array.
+      const existingIds = new Set(
+        dedupeChatMessages(ychat.toArray()).map((msg) => msg.id)
+      );
+      const incoming = dedupeChatMessages(data.chat).filter(
+        (msg) => !existingIds.has(msg.id)
+      );
+      if (incoming.length > 0) ychat.push(incoming);
     }
   });
 }

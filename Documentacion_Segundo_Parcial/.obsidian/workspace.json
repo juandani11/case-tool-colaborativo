@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "07_Despliegue.md",
+                "file": "01_Requisitos_y_Proceso.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "07_Despliegue"
+              "title": "01_Requisitos_y_Proceso"
             }
           }
         ]
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "07_Despliegue.md",
+                "file": "01_Arquitectura.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -118,7 +118,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "07_Despliegue.md",
+                "file": "01_Arquitectura.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -161,7 +161,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "07_Despliegue.md",
+                "file": "01_Arquitectura.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -190,16 +190,22 @@
   },
   "active": "e1c6945bb08dad64",
   "lastOpenFiles": [
-    "09_Conclusiones.md",
+    "03_Diseno_Arquitectura.md",
+    "02_Analisis.md",
+    "01_Requisitos_y_Proceso.md",
+    "04_Diseno_UML.md",
+    "05_Implementacion_y_Pruebas.md",
+    "06_Anexos_y_Glosario.md",
+    "00_Indice.md",
+    "07_Despliegue.md",
     "01_Arquitectura.md",
     "08_Manual_Usuario.md",
-    "07_Despliegue.md",
+    "09_Conclusiones.md",
     "10_Anexos.md",
+    "05_Implementacion.md",
     "04_Diseno.md",
-    "06_Trazabilidad.md",
-    "00_Indice.md",
     "03_Analisis.md",
-    "02_Proceso.md",
-    "05_Implementacion.md"
+    "06_Trazabilidad.md",
+    "02_Proceso.md"
   ]
 }

@@ -8,6 +8,7 @@ const aclRoutes = require('./routes/acl');
 const diagramRoutes = require('./routes/diagrams');
 const accessRequestRoutes = require('./routes/accessRequests');
 const aiRoutes = require('./routes/ai');
+const generatorRoutes = require('./routes/generator');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 function createApp() {
@@ -32,6 +33,7 @@ function createApp() {
   app.use('/api', accessRequestRoutes);
   app.use('/api', diagramRoutes);
   app.use('/api/ai', aiRoutes);
+  app.use('/api/generate', generatorRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

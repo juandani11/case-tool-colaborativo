@@ -30,7 +30,7 @@ import {
   loadDiagramDataToYjs,
 } from '../utils/yjsDiagramIo';
 import { teardown } from '../utils/yjsTeardown';
-import { buildChatMessage } from '../utils/chatMessage';
+import { buildChatMessage, dedupeChatMessages } from '../utils/chatMessage';
 
 import type { ChatMessage, ConnectedUser } from '../types/collaboration';
 export type { ChatMessage, ConnectedUser } from '../types/collaboration';
@@ -161,7 +161,7 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     };
 
     const onChatChange = () => {
-      setMessages(ychat.toArray());
+      setMessages(dedupeChatMessages(ychat.toArray()));
     };
 
     yn.observeDeep(onNodesDeepChange);
@@ -171,7 +171,7 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     // Initial load
     setNodes(nodesToArray(yn));
     setEdges(edgesToArray(ye));
-    setMessages(ychat.toArray());
+    setMessages(dedupeChatMessages(ychat.toArray()));
 
     // ── 3. Cleanup ──────────────────────────────────────────────────
     teardown(prevProvider, prevDoc);

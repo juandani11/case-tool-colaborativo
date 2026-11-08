@@ -1,0 +1,132 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actor {
+    BackgroundColor #F2F5F9
+    BorderColor #1F497D
+}
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor #1F497D
+    ArrowColor #1F497D
+}
+
+title Diagrama de Casos de Uso - Herramienta Colaborativa UML & Spring Boot
+
+' ==========================================
+' ACTORES
+' ==========================================
+actor "Usuario Registrado" as UR
+actor "Anfitrión (Host)" as Host
+actor "Invitado (Guest)" as Guest
+actor "Agente de IA (Local)" as IA
+actor "Servicio Sincronización" as Sync
+
+' Jerarquía de actores
+UR <|-- Host
+UR <|-- Guest
+
+' ==========================================
+' SISTEMA Y CASOS DE USO
+' ==========================================
+rectangle "Sistema de Diseño UML y Generación Spring Boot" {
+
+    package "Módulo de Gestión de Cuentas" {
+        usecase "CU-01: Registrar cuenta de usuario" as CU01
+        usecase "CU-02: Autenticar usuario" as CU02
+        usecase "CU-03: Recuperar contraseña" as CU03
+        usecase "CU-04: Gestionar perfil de usuario" as CU04
+    }
+
+    package "Módulo de Gestión de Proyectos" {
+        usecase "CU-05: Crear proyecto" as CU05
+        usecase "CU-06: Invitar usuarios al proyecto" as CU06
+        usecase "CU-07: Unirse a un proyecto" as CU07
+        usecase "CU-08: Administrar permisos de invitados" as CU08
+    }
+
+    package "Módulo de Edición Colaborativa" {
+        usecase "CU-09: Modelar diagrama UML" as CU09
+        usecase "CU-10: Visualizar diagrama" as CU10
+    }
+
+    package "Módulo de Asistencia IA (Local)" {
+        usecase "CU-11: Generar diagrama desde prompt textual" as CU11
+        usecase "CU-12: Generar diagrama desde archivo de audio" as CU12
+        usecase "CU-13: Generar diagrama desde imagen de boceto" as CU13
+    }
+
+    package "Módulo de Generación y Configuración" {
+        usecase "CU-14: Configurar dependencias del proyecto" as CU14
+        usecase "CU-15: Exportar proyecto Spring Boot" as CU15
+    }
+
+    package "Módulo de Importación / Exportación" {
+        usecase "CU-16: Importar diagrama" as CU16
+        usecase "CU-17: Exportar diagrama" as CU17
+    }
+}
+
+' ==========================================
+' RELACIONES DE USUARIOS
+' ==========================================
+UR --> CU01
+UR --> CU02
+UR --> CU03
+UR --> CU04
+
+Host --> CU05
+Host --> CU06
+Host --> CU08
+
+Guest --> CU07
+
+Host --> CU09
+Guest --> CU09
+Guest --> CU10
+
+Host --> CU11
+Host --> CU12
+Host --> CU13
+
+Host --> CU14
+Host --> CU15
+Host --> CU16
+Host --> CU17
+
+' ==========================================
+' RELACIONES CON ACTORES SECUNDARIOS
+' ==========================================
+CU11 <-- IA
+CU12 <-- IA
+CU13 <-- IA
+
+CU09 <-- Sync
+
+' ==========================================
+' RELACIONES DE INCLUDE Y EXTEND
+' ==========================================
+
+' Inclusiones de Autenticación
+CU05 .> CU02 : <<include>>
+CU07 .> CU02 : <<include>>
+CU09 .> CU02 : <<include>>
+
+' Inclusiones de Dependencia Jerárquica
+CU06 .> CU05 : <<include>>
+CU08 .> CU06 : <<include>>
+CU10 .> CU09 : <<include>>
+CU15 .> CU09 : <<include>>
+
+' Extensiones de IA sobre el modelado UML
+CU11 .> CU09 : <<extend>>
+CU12 .> CU09 : <<extend>>
+CU13 .> CU09 : <<extend>>
+
+' Extensiones de Configuración e I/O
+CU15 .> CU14 : <<extend>>
+CU16 .> CU09 : <<extend>>
+CU17 .> CU09 : <<extend>>
+
+@enduml

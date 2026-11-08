@@ -1,0 +1,127 @@
+{
+	"_type": "Project",
+	"_id": "AAAAAAFF+h6SjaM2EzA=",
+	"name": "HerramientaColaborativaUML",
+	"ownedElements": [
+		{
+			"_type": "UMLModel",
+			"_id": "AAAAAAFF+qBWK6M3Z8Y=",
+			"_parent": {
+				"$ref": "AAAAAAFF+h6SjaM2EzA="
+			},
+			"name": "Model",
+			"ownedElements": [
+				{
+					"_type": "UMLUseCaseDiagram",
+					"_id": "AAAAAAFF+qBtyKM79qY=",
+					"_parent": {
+						"$ref": "AAAAAAFF+qBWK6M3Z8Y="
+					},
+					"name": "Diagrama de Casos de Uso",
+					"ownedViews": [
+						{
+							"_type": "UMLActorView",
+							"_id": "AAAAAAGV1ActActor001=",
+							"_parent": {
+								"$ref": "AAAAAAFF+qBtyKM79qY="
+							},
+							"model": {
+								"$ref": "AAAAAAGV1ActActorElem01="
+							},
+							"subViews": [
+								{
+									"_type": "UMLNameCompartmentView",
+									"_id": "AAAAAAGV1ActActorName01=",
+									"_parent": {
+										"$ref": "AAAAAAGV1ActActor001="
+									},
+									"model": {
+										"$ref": "AAAAAAGV1ActActorElem01="
+									},
+									"subViews": [
+										{
+											"_type": "LabelView",
+											"_id": "AAAAAAGV1NameLbl01=",
+											"_parent": {
+												"$ref": "AAAAAAGV1ActActorName01="
+											},
+											"text": "Usuario Registrado"
+										}
+									],
+									"font": "Arial;13;0",
+									"left": 80,
+									"top": 140,
+									"width": 110,
+									"height": 13
+								}
+							],
+							"font": "Arial;13;0",
+							"left": 110,
+							"top": 80,
+							"width": 50,
+							"height": 60
+						},
+						{
+							"_type": "UMLUseCaseView",
+							"_id": "AAAAAAGV1UCView001=",
+							"_parent": {
+								"$ref": "AAAAAAFF+qBtyKM79qY="
+							},
+							"model": {
+								"$ref": "AAAAAAGV1UCElem001="
+							},
+							"subViews": [
+								{
+									"_type": "UMLNameCompartmentView",
+									"_id": "AAAAAAGV1UCName001=",
+									"_parent": {
+										"$ref": "AAAAAAGV1UCView001="
+									},
+									"model": {
+										"$ref": "AAAAAAGV1UCElem001="
+									},
+									"subViews": [
+										{
+											"_type": "LabelView",
+											"_id": "AAAAAAGV1UCLbl001=",
+											"_parent": {
+												"$ref": "AAAAAAGV1UCName001="
+											},
+											"text": "CU-02: Autenticar usuario"
+										}
+									],
+									"font": "Arial;13;0",
+									"left": 280,
+									"top": 90,
+									"width": 160,
+									"height": 25
+								}
+							],
+							"font": "Arial;13;0",
+							"left": 270,
+							"top": 80,
+							"width": 180,
+							"height": 45
+						}
+					]
+				},
+				{
+					"_type": "UMLActor",
+					"_id": "AAAAAAGV1ActActorElem01=",
+					"_parent": {
+						"$ref": "AAAAAAFF+qBWK6M3Z8Y="
+					},
+					"name": "Usuario Registrado"
+				},
+				{
+					"_type": "UMLUseCase",
+					"_id": "AAAAAAGV1UCElem001=",
+					"_parent": {
+						"$ref": "AAAAAAFF+qBWK6M3Z8Y="
+					},
+					"name": "CU-02: Autenticar usuario"
+				}
+			]
+		}
+	]
+}

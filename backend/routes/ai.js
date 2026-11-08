@@ -1,8 +1,6 @@
 'use strict';
 
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
 const { requireAuth, authEnabled } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const aclService = require('../services/aclService');
@@ -15,7 +13,6 @@ const {
   getMutationsFromAI,
 } = require('../services/aiService');
 const { emitChatMessage } = require('../realtime/yjs');
-const { generateProject } = require('../generator/generate');
 const { asyncHandler, httpError } = require('../errors');
 const {
   validateCommandPayload,
@@ -254,17 +251,6 @@ router.post('/from-image', requireAuth, upload.single('image'), asyncHandler(asy
   if (!checkedMutations.ok) throw httpError(502, 'La IA devolvió un formato inválido');
 
   res.json({ mutations: checkedMutations.value, username });
-}));
-
-router.post('/generate', requireAuth, asyncHandler(async (req, res) => {
-  const stateCheck = validateAstState(req.body?.currentState, { requireEntities: true });
-  if (!stateCheck.ok) throw httpError(400, stateCheck.error);
-
-  const zipPath = await generateProject(stateCheck.value);
-  res.download(zipPath, 'backend-generado.zip', (err) => {
-    if (err) console.error('Error al descargar ZIP:', err);
-    fs.rmSync(path.dirname(zipPath), { recursive: true, force: true });
-  });
 }));
 
 module.exports = router;

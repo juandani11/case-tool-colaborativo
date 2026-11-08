@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "enterprise-architect": {
+      "type": "local",
+      "command": [
+        "C:\\Program Files (x86)\\Sparx Systems\\EA Trial\\MCP_Server\\MCP3.exe",
+        "-enableEdit",
+        "-setTimeout",
+        "120"
+      ],
+      "enabled": true
+    }
+  }
+}

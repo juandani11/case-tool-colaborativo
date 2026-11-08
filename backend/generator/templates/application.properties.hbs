@@ -1,7 +1,14 @@
-spring.datasource.url=jdbc:postgresql://localhost:5432/diagramdb
-spring.datasource.username=postgres
-spring.datasource.password=postgres
+# Configuracion de Base de Datos (PostgreSQL)
+spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/diagramdb}
+spring.datasource.username=${DB_USER:postgres}
+spring.datasource.password=${DB_PASSWORD:postgres}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# Configuracion de JPA / Hibernate
 spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.format_sql=true
 spring.jpa.properties.hibernate.auto_quote_keyword=true
 spring.flyway.enabled=false
 server.port=8080

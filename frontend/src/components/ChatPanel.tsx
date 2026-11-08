@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef, useEffect, useState, memo } from 'react';
+import { useRef, useEffect, useMemo, useState, memo } from 'react';
 import { ChatMessage } from '../hooks/useCollaborativeFlow';
 import { AiProvider } from '../types/diagram';
 import { AiConfig } from '../hooks/useAiProvider';
 import AiConfigModal from './AiConfigModal';
+import { dedupeChatMessages } from '../utils/chatMessage';
 
 // UI del asistente de IA: historial + input de texto + microfono. Pura vista:
 // la logica vive en useAICommand (texto/voz/imagen). Los mensajes llegan por
@@ -72,6 +73,7 @@ function ChatPanelInner({
   aiConfig,
   onAiConfigChange,
 }: ChatPanelProps) {
+  const visibleMessages = useMemo(() => dedupeChatMessages(messages), [messages]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const stickToBottomRef = useRef(true);
@@ -101,7 +103,7 @@ function ChatPanelInner({
     const el = scrollRef.current;
     if (!el || !stickToBottomRef.current) return;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages, isProcessing, isOpen]);
+  }, [visibleMessages, isProcessing, isOpen]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -218,12 +220,12 @@ function ChatPanelInner({
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-3"
       >
-        {messages.length === 0 && !isProcessing && (
+        {visibleMessages.length === 0 && !isProcessing && (
           <div className="text-center text-gray-400 text-xs mt-8">
             Escribe un comando para comenzar.
           </div>
         )}
-        {messages.map((msg) => {
+        {visibleMessages.map((msg) => {
           const isAI = msg.sender === 'ia';
           const isOwn =
             msg.sender === 'user' &&

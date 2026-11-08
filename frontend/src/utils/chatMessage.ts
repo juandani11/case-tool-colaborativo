@@ -1,5 +1,26 @@
 import { ChatMessage } from '../types/collaboration';
 
+// El chat vive en Yjs y ademas se hidrata desde PostgreSQL. Varios clientes
+// (o dos montajes de React) pueden insertar el mismo mensaje `db_*` en la
+// Y.Array; React no permite keys repetidas. Deduplicamos por id conservando
+// el primer mensaje (orden cronologico original).
+export function dedupeChatMessages<T extends { id?: string }>(messages: T[]): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const message of messages) {
+    if (!message) continue;
+    const id = typeof message.id === 'string' ? message.id : '';
+    if (!id) {
+      unique.push(message);
+      continue;
+    }
+    if (seen.has(id)) continue;
+    seen.add(id);
+    unique.push(message);
+  }
+  return unique;
+}
+
 export function buildChatMessage(
   sender: ChatMessage['sender'],
   text: string,
