@@ -421,6 +421,225 @@ Estas clases pertenecen a la **capa de dominio/persistencia**: se materializan e
 - Un `Usuario` puede crear `0..*` solicitudes de acceso; cada `AccessRequest` tiene un único `requester_id`.
 - Un `Diagrama` puede recibir `0..*` solicitudes; cada `AccessRequest` referencia un único `diagram_id`.
 
+#### 3.4.1. Modelo conceptual de datos de la herramienta
+
+```mermaid
+classDiagram
+    class User {
+        +UUID id
+        +String name
+        +String email
+        +String password
+        +String rol
+    }
+
+    class Project {
+        +UUID id
+        +String name
+        +String description
+    }
+
+    class ProjectMember {
+        +UUID id
+        +String rol
+        +Date fechaIngreso
+    }
+
+    class Diagram {
+        +UUID id
+        +Integer version
+        +String tipoModelo
+    }
+
+    class Class {
+        +UUID id
+        +String name
+        +Double positionX
+        +Double positionY
+    }
+
+    class Relation {
+        +UUID id
+        +String type
+        +Integer sourceMin
+        +Integer targetMin
+    }
+
+    User "1" --> "0..*" ProjectMember : participa
+    User "1" --> "0..*" Project : posee
+    Project "1" --> "0..*" ProjectMember : incluye
+    Project "1" --> "0..*" Diagram : contiene
+    Diagram "1" --> "0..*" Class : define
+    Diagram "1" --> "0..*" Relation : define
+    Class "1" --> "0..*" Relation : origen/destino
+```
+
+#### 3.4.2. Transformación del Modelo Conceptual al Modelo Físico (Neon)
+
+> **Decisión de Arquitectura de Datos:**
+> El diagrama anterior representa el **Modelo Conceptual de Negocio** de la herramienta, donde el usuario entiende el sistema a través de Proyectos, Diagramas, Clases y Relaciones.
+>
+> Sin embargo, para el **Modelo Físico de Persistencia** (implementado en PostgreSQL/Neon), aplicamos una optimización de rendimiento crítica para herramientas colaborativas en tiempo real. Guardar cada clase y relación como una fila independiente en SQL generaría un cuello de botella (operaciones de lectura/escritura de miles de filas por segundo) que destruiría la experiencia en tiempo real de Yjs.
+>
+> Por lo tanto, el modelo físico se implementó de la siguiente manera:
+> 1. **Sectorización (Esquemas):** La información se dividió en `auth` (usuarios y ACLs), `core` (diagramas) y `chat` (mensajes).
+> 2. **Persistencia de Lienzo (Yjs Snapshot):** Las clases y relaciones del diagrama se guardan como un **documento CRDT comprimido (columna `yjs_snapshot` de tipo BYTEA)** en la tabla `core.diagrams`.
+> 3. **Fidelidad y Rendimiento:** Esta decisión garantiza que el software sea 100% fiel al modelo conceptual, pero logrando la velocidad de sincronización instantánea requerida. La tabla `Project` se abstrae en la lógica de la aplicación y se materializa a través de la relación entre `auth.users` y `core.diagrams`.
+
+#### 3.4.3. Modelo Físico y Lógico Real (Ingeniería Inversa)
+
+Diagrama EA: `05_Modelo_Logico_Real_Codigo`. Este modelo fue reconstruido desde el código real; no es el modelo conceptual idealizado.
+
+```mermaid
+classDiagram
+    namespace auth {
+        class users {
+            +UUID id
+            +VARCHAR username
+            +VARCHAR email
+            +VARCHAR password_hash
+            +TIMESTAMP created_at
+        }
+
+        class diagram_acl {
+            +UUID id
+            +VARCHAR diagram_id
+            +UUID user_id
+            +VARCHAR role
+            +TIMESTAMP granted_at
+        }
+
+        class access_requests {
+            +UUID id
+            +VARCHAR diagram_id
+            +UUID requester_id
+            +VARCHAR status
+            +TIMESTAMP created_at
+        }
+    }
+
+    namespace core {
+        class diagrams {
+            +VARCHAR id
+            +VARCHAR name
+            +UUID owner_id
+            +BYTEA yjs_snapshot
+            +TIMESTAMP updated_at
+        }
+    }
+
+    namespace chat {
+        class messages {
+            +UUID id
+            +VARCHAR diagram_id
+            +VARCHAR author
+            +VARCHAR role
+            +TEXT content
+            +TIMESTAMP created_at
+        }
+    }
+
+    users "1" --> "0..*" diagram_acl : user_id
+    diagrams "1" ..> "0..*" diagram_acl : diagram_id (logica, sin FK)
+    diagrams "1" --> "0..*" access_requests : diagram_id
+    users "1" --> "0..*" access_requests : requester_id
+    users "1" --> "0..*" diagrams : owner_id
+    diagrams "1" --> "0..*" messages : diagram_id
+```
+
+**Claves primarias y foráneas:**
+
+| Tabla | PK | FK |
+|---|---|---|
+| `auth.users` | `id` | — |
+| `auth.diagram_acl` | `id` | `user_id -> auth.users.id`; `diagram_id` es relacion logica, sin FK fisica |
+| `auth.access_requests` | `id` | `requester_id → auth.users.id`, `diagram_id → core.diagrams.id` |
+| `core.diagrams` | `id` | `owner_id → auth.users.id` |
+| `chat.messages` | `id` | `diagram_id → core.diagrams.id` |
+
+> **Nota:** `auth.diagram_acl.diagram_id` no tiene FK física por una decisión de rendimiento. La integridad referencial se maneja en la capa de aplicación: `deleteDiagram` elimina primero la ACL y después el diagrama dentro de una transacción.
+
+> **Nota:** La columna `yjs_snapshot` (BYTEA) almacena el estado del lienzo colaborativo (CRDT) para garantizar la sincronización en tiempo real entre los usuarios.
+
+#### 3.4.4. Persistencia Física del Lienzo Colaborativo (Yjs + BYTEA)
+
+El documento Yjs se serializa y se guarda en `core.diagrams.yjs_snapshot` como un binario `BYTEA`. La implementación real está en `backend/services/diagramService.js` y `backend/realtime/yjs.js`.
+
+**Guardado real:**
+
+```javascript
+// backend/services/diagramService.js
+async function saveSnapshot(diagramId, update) {
+  const id = safeId(diagramId);
+  if (!id || !update) return;
+
+  await pool.query(
+    `UPDATE core.diagrams
+     SET yjs_snapshot = $2, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1`,
+    [id, Buffer.from(update)]
+  );
+}
+```
+
+**Recuperación real:**
+
+```javascript
+// backend/services/diagramService.js
+async function getSnapshot(diagramId) {
+  const id = safeId(diagramId);
+  if (!id) return null;
+
+  const { rows } = await pool.query(
+    'SELECT yjs_snapshot FROM core.diagrams WHERE id = $1',
+    [id]
+  );
+
+  return rows[0]?.yjs_snapshot || null;
+}
+```
+
+```javascript
+// backend/realtime/yjs.js
+const snapshot = await diagramService.getSnapshot(diagramId);
+if (snapshot) {
+  Y.applyUpdate(ydoc, new Uint8Array(snapshot));
+}
+```
+
+**Debounce de 2 segundos:**
+
+```javascript
+// backend/realtime/yjs.js
+const SNAPSHOT_DEBOUNCE_MS = 2000;
+const snapshotTimers = new Map();
+
+function scheduleSnapshot(docName, ydoc, diagramId, delay = SNAPSHOT_DEBOUNCE_MS) {
+  if (ydoc.snapshotError) return;
+
+  const previous = snapshotTimers.get(docName);
+  if (previous) clearTimeout(previous);
+
+  const timer = setTimeout(async () => {
+    snapshotTimers.delete(docName);
+    if (ydoc.snapshotError) return;
+
+    try {
+      await diagramService.saveSnapshot(
+        diagramId,
+        Y.encodeStateAsUpdate(ydoc)
+      );
+    } catch (err) {
+      console.error(`No se pudo guardar el snapshot de ${diagramId}:`, err.message);
+    }
+  }, delay);
+
+  snapshotTimers.set(docName, timer);
+}
+```
+
+El lienzo se actualiza instantáneamente en memoria; el `UPDATE` viaja a PostgreSQL/Neon dos segundos después del último cambio. La guía extendida está en `GUIA_YJS_SNAPSHOT.md`.
+
 ### 3.5. Diagrama de Componentes del Backend (Node.js / Clean Architecture)
 
 ```mermaid
@@ -428,15 +647,17 @@ flowchart LR
     CLIENTE["Cliente Next.js"] --> RUTAS["Capa de Rutas<br/>app.js · routes/*"]
     RUTAS --> MW["Capa de Middleware<br/>auth · diagramAuth · errorHandler"]
     MW --> SVC["Capa de Servicios<br/>user · acl · diagram · chat · accessRequest · ai · generate"]
-    SVC --> REPO["Capa de Persistencia<br/>db.js · SQL parametrizado"]
-    REPO --> NEON[("PostgreSQL / Neon<br/>auth · core · chat")]
+    SVC --> DBPERSIST["Capa de Persistencia<br/>db.js · SQL parametrizado"]
+    DBPERSIST --> NEON[("PostgreSQL / Neon<br/>auth · core · chat")]
     SVC --> AI["Adaptador IA<br/>Groq / Ollama"]
     SVC --> GEN["Generador<br/>Handlebars + ZIP"]
     WS["WebSocket Server (Yjs)<br/>realtime/yjs.js"] --> SVC
-    WS --> REPO
+    WS --> DBPERSIST
 ```
 
-La capa de persistencia se implementa en `db.js` y en las funciones SQL parametrizadas de los servicios; no existe una carpeta `repositories/` separada. El diagrama mantiene la regla de dependencia de Clean Architecture: `Cliente → Rutas → Middleware → Servicios → Persistencia → PostgreSQL`. La API no accede directamente a PostgreSQL y el servidor WebSocket reutiliza los mismos servicios de ACL, diagrama y chat, evitando duplicar reglas de negocio.
+La capa de persistencia se implementa en `db.js` y en las funciones SQL parametrizadas de los servicios. El diagrama mantiene la regla de dependencia de Clean Architecture: `Cliente → Rutas → Middleware → Servicios → Persistencia → PostgreSQL`. La API no accede directamente a PostgreSQL y el servidor WebSocket reutiliza los mismos servicios de ACL, diagrama y chat, evitando duplicar reglas de negocio.
+
+> **Aclaracion de arquitectura:** en la herramienta Node.js/Express no existe una clase `Repository`; el acceso a PostgreSQL se realiza en `db.js` y en las consultas SQL de los servicios. El patrón Repository sí aparece en el backend Spring Boot generado, donde `JpaRepository` es parte del código Java producido.
 
 ### 3.6. Diagrama de Componentes del Backend Generado (Spring Boot)
 
@@ -538,7 +759,6 @@ El diagrama canónico de requisitos está en `01_Requisitos_y_Proceso.md`. Esta 
 
 ```mermaid
 flowchart LR
-    V["Visitante"]
     I["Ingeniero de Software"]
     C["Colaborador"]
 
@@ -550,8 +770,6 @@ flowchart LR
     CU06(["CU-06 Interactuar con Agente IA"])
     CU07(["CU-07 Generar backend"])
     CU08(["CU-08 Consultar manual"])
-
-    V --> CU01
     I --> CU01
     I --> CU02
     I --> CU03

@@ -443,11 +443,10 @@ El modelo C4 describe la arquitectura desde el contexto hasta el código. Los ni
 
 ### 1.11.1. C4 Nivel 1: Contexto del sistema
 
-El Sistema CASE es usado por tres actores humanos y depende de proveedores externos de IA y de PostgreSQL. Groq y Ollama no son actores que inician casos de uso: son sistemas externos consumidos por el backend.
+El Sistema CASE es usado por dos actores humanos y depende de proveedores externos de IA y de PostgreSQL. Groq y Ollama no son actores que inician casos de uso: son sistemas externos consumidos por el backend.
 
 ```mermaid
 flowchart LR
-    VIS["Visitante<br/><<person>>"]
     ING["Ingeniero de Software<br/><<person>>"]
     COL["Colaborador<br/><<person>>"]
 
@@ -458,8 +457,6 @@ flowchart LR
     GROQ["Groq Cloud<br/><<external system>>"]
     OLLAMA["Ollama local / túnel<br/><<external system>>"]
     NEON[("Neon PostgreSQL<br/><<external system>>")]
-
-    VIS -->|"registro / login"| SYS
     ING -->|"modela, colabora, genera"| SYS
     COL -->|"edita / consulta"| SYS
     SYS -->|"HTTPS"| GROQ

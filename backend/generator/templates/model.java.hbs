@@ -15,21 +15,29 @@ import java.time.LocalDate;
 @DiscriminatorColumn(name = "dtype")
 {{/if}}
 {{#if inheritance.parentEntity}}
-@PrimaryKeyJoinColumn(name = "id")
+@PrimaryKeyJoinColumn(name = "{{inheritance.parentPkJoinColumn}}")
 {{/if}}
 public class {{entityNamePascal}} {{#if inheritance.parentEntity}}extends {{inheritance.parentEntityPascal}}{{/if}} {
 
+    {{#unless inheritance.parentEntity}}
     {{#if primaryKey.isUuid}}
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "{{primaryKey.name}}", updatable = false, nullable = false)
     private UUID {{primaryKey.nameCamel}};
     {{else}}
+    {{#if primaryKey.isGeneratedNumeric}}
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "{{primaryKey.name}}", updatable = false, nullable = false)
     private {{primaryKey.javaType}} {{primaryKey.nameCamel}};
+    {{else}}
+    @Id
+    @Column(name = "{{primaryKey.name}}", updatable = false, nullable = false)
+    private {{primaryKey.javaType}} {{primaryKey.nameCamel}};
     {{/if}}
+    {{/if}}
+    {{/unless}}
 
     {{#each attributes}}
     {{#unless isPk}}

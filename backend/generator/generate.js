@@ -64,17 +64,28 @@ function generateProject(ast) {
       const entityContexts = [];
 
       for (const entity of entities) {
+        // Inheritance info (needed before PK: un hijo usa la PK del padre)
+        const inheritance = buildInheritanceInfo(entity, entities, relationships);
+
         // Primary key
         let primaryKeyAttr = entity.attributes.find(a => a.isPk);
+        if (!primaryKeyAttr && inheritance?.parentEntity) {
+          const parentEntity = entities.find(e => e.name === inheritance.parentEntity);
+          primaryKeyAttr = parentEntity?.attributes.find(a => a.isPk);
+        }
         let primaryKey;
         if (primaryKeyAttr) {
+          const pkJavaType = getJavaType(primaryKeyAttr.type);
           primaryKey = {
             name: toJavaFieldName(primaryKeyAttr.name, 'Atributo'),
             namePascal: toJavaClassName(primaryKeyAttr.name, 'Atributo'),
             nameCamel: toJavaFieldName(primaryKeyAttr.name, 'Atributo'),
-            javaType: getJavaType(primaryKeyAttr.type),
+            javaType: pkJavaType,
             sqlType: getSqlType(primaryKeyAttr.type),
             isUuid: primaryKeyAttr.type === 'UUID',
+            // Solo las PK numericas usan IDENTITY. Una PK natural
+            // (String, Date, etc.) se asigna por el usuario/servicio.
+            isGeneratedNumeric: pkJavaType === 'Long' || pkJavaType === 'Integer',
           };
         } else {
           primaryKey = {
@@ -84,24 +95,22 @@ function generateProject(ast) {
             javaType: 'Long',
             sqlType: 'BIGSERIAL',
             isUuid: false,
+            isGeneratedNumeric: true,
           };
         }
 
         // Relations for this entity
         const relations = buildEntityRelations(entity, entities, relationships);
 
-        // Inheritance info
-        const inheritance = buildInheritanceInfo(entity, entities, relationships);
-
         // Check if this entity is a parent (has children)
         const isParent = relationships.some(
-          r => r.type === 'INHERITANCE' && relFromName(r, entities) === entity.name
+          r => r.type === 'INHERITANCE' && relToName(r, entities) === entity.name
         );
         const children = relationships
-          .filter(r => r.type === 'INHERITANCE' && relFromName(r, entities) === entity.name)
+          .filter(r => r.type === 'INHERITANCE' && relToName(r, entities) === entity.name)
           .map(r => ({
-            childEntity: relToName(r, entities),
-            childEntityPascal: toJavaClassName(relToName(r, entities)),
+            childEntity: relFromName(r, entities),
+            childEntityPascal: toJavaClassName(relFromName(r, entities)),
           }));
 
         // ¿Es una entidad intermedia de una relación * a *?
@@ -157,7 +166,7 @@ function generateProject(ast) {
           attributes: mappedAttributes,
           // Campos para getters/setters explícitos del modelo:
           // PK + atributos (sin colisiones FK) + campos de relaciones.
-          accessors: buildModelAccessors(primaryKey, mappedAttributes, relations),
+          accessors: buildModelAccessors(primaryKey, mappedAttributes, relations, inheritance),
           // Campos para getters/setters explícitos del DTO (sin duplicados:
           // si un atributo ya se llama como el FK auto-generado, se reutiliza).
           dtoAccessors: buildDtoAccessors(primaryKey, mappedAttributes, relations),
@@ -228,6 +237,11 @@ function generateProject(ast) {
       }));
 
       // ── 8. Flyway migration ──
+      writeFile(
+        'clean.sql',
+        'DROP SCHEMA public CASCADE;\nCREATE SCHEMA public;\n'
+      );
+
       writeFile(
         'src/main/resources/db/migration/V1__init.sql',
         templates['migration']({ entities: entityContexts })

@@ -24,11 +24,7 @@ import {
   removeEdge as yRemoveEdge,
   edgesToArray,
 } from '../utils/yjsEdgeHelpers';
-import {
-  exportDiagramData,
-  importDiagramFile,
-  loadDiagramDataToYjs,
-} from '../utils/yjsDiagramIo';
+import { loadDiagramDataToYjs } from '../utils/yjsDiagramIo';
 import { teardown } from '../utils/yjsTeardown';
 import { buildChatMessage, dedupeChatMessages } from '../utils/chatMessage';
 
@@ -57,10 +53,6 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
   const yNodesRef = useRef<Y.Map<any> | null>(null);
   const yEdgesRef = useRef<Y.Map<any> | null>(null);
 
-  const nodesRef = useRef(nodes);
-  nodesRef.current = nodes;
-  const edgesRef = useRef(edges);
-  edgesRef.current = edges;
   const isDraggingRef = useRef(false);
 
   useEffect(() => {
@@ -316,18 +308,6 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     addEdge(newEdge);
   }, [addEdge]);
 
-  const exportDiagram = useCallback(() => {
-    exportDiagramData(nodesRef.current, edgesRef.current);
-  }, []);
-
-  const importDiagram = useCallback((file: File) => {
-    importDiagramFile(file, {
-      yn: yNodesRef.current,
-      ye: yEdgesRef.current,
-      doc: ydocRef.current,
-    });
-  }, []);
-
   /**
    * Load diagram data directly from a parsed JSON object (from server REST API).
    */
@@ -371,8 +351,6 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     addEdge,
     removeEdge: removeEdgeById,
     updateEdge,
-    exportDiagram,
-    importDiagram,
     loadDiagramData,
     isConnected,
     connectedUsers,

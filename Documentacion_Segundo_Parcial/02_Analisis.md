@@ -305,7 +305,7 @@ La duplicidad es deliberada: Yjs proporciona colaboración y convergencia; Postg
 ```mermaid
 sequenceDiagram
     autonumber
-    actor V as Visitante
+    actor V as Ingeniero de Software
     participant UI as Login/Register
     participant API as routes/auth.js
     participant US as userService

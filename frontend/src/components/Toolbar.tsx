@@ -12,15 +12,13 @@ import { DS } from '../styles/design-system';
 import AppLogo from './AppLogo';
 
 // Barra superior del editor: acciones de diagrama (Entidad, Conexion),
-// archivo (JSON/XMI, Importar, Desde imagen, Generar), Chat, Miembros,
-// Ayuda, presencia, estado de conexion y usuario. Es controlada: toda la
-// logica vive en page.tsx via props; aqui solo UI + inputs file ocultos.
+// interoperabilidad XMI, Desde imagen, Generar, Chat, Miembros, Ayuda,
+// presencia, estado de conexion y usuario. Es controlada: toda la logica
+// vive en page.tsx via props; aqui solo UI + inputs file ocultos.
 interface ToolbarProps {
   isConnected: boolean;
   onAddEntity: () => void;
-  onExport: () => void;
   onExportXmi: () => void;
-  onImport: (file: File) => void;
   onImportXmi: (file: File) => void;
   onGenerateBackend: () => void;
   onFromImage: (file: File) => void;
@@ -39,9 +37,7 @@ interface ToolbarProps {
 export default function Toolbar({
   isConnected,
   onAddEntity,
-  onExport,
   onExportXmi,
-  onImport,
   onImportXmi,
   onGenerateBackend,
   onFromImage,
@@ -56,20 +52,11 @@ export default function Toolbar({
   onToggleMembers,
   isMembersOpen,
 }: ToolbarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const xmiInputRef = useRef<HTMLInputElement>(null);
   const [showRelationSelector, setShowRelationSelector] = useState(false);
   const router = useRouter();
   const help = useHelpModal();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onImport(file);
-    }
-    e.target.value = '';
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -140,15 +127,8 @@ export default function Toolbar({
         </>
       )}
 
-      {/* Export Actions */}
+      {/* Interoperabilidad XMI */}
       <ToolGroup>
-        <ToolButton onClick={onExport} tooltip="Exportar diagrama a JSON" ariaLabel="Exportar JSON">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v7m0 0L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span className="hidden whitespace-nowrap xl:inline">Exportar JSON</span>
-        </ToolButton>
         <ToolButton onClick={onExportXmi} tooltip="Exportar XMI para Enterprise Architect" ariaLabel="Exportar XMI">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v7m0 0L4 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -156,28 +136,23 @@ export default function Toolbar({
           </svg>
           <span className="hidden whitespace-nowrap xl:inline">Exportar XMI</span>
         </ToolButton>
+        {!readOnly && (
+          <ToolButton onClick={() => xmiInputRef.current?.click()} tooltip="Importar XMI desde Enterprise Architect" ariaLabel="Importar XMI">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 9V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span className="hidden whitespace-nowrap xl:inline">Importar XMI</span>
+          </ToolButton>
+        )}
       </ToolGroup>
 
       <div className="w-px h-5 bg-gray-200 mx-1" />
 
-      {/* Import / Generate Actions */}
+      {/* Generar / Desde imagen */}
       <ToolGroup>
         {!readOnly && (
           <>
-            <ToolButton onClick={() => fileInputRef.current?.click()} tooltip="Importar diagrama desde JSON" ariaLabel="Importar JSON">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 9V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <span className="hidden whitespace-nowrap xl:inline">Importar JSON</span>
-            </ToolButton>
-            <ToolButton onClick={() => xmiInputRef.current?.click()} tooltip="Importar XMI desde Enterprise Architect" ariaLabel="Importar XMI">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 9V2M4 5l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M2 10v1.5A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <span className="hidden whitespace-nowrap xl:inline">Importar XMI</span>
-            </ToolButton>
             <ToolButton
               onClick={() => imageInputRef.current?.click()}
               tooltip="Generar diagrama desde imagen"
@@ -206,13 +181,6 @@ export default function Toolbar({
             </ToolButton>
           </>
         )}
-        <input
-          type="file"
-          accept=".json"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          className="hidden"
-        />
         <input
           type="file"
           accept="image/*"

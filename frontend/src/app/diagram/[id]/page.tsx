@@ -92,8 +92,6 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     removeNode,
     addEdge,
     removeEdge,
-    exportDiagram,
-    importDiagram,
     loadDiagramData,
     isConnected,
     connectedUsers,
@@ -216,9 +214,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
       <Toolbar
         isConnected={isConnected}
         onAddEntity={handleAddEntity}
-        onExport={exportDiagram}
         onExportXmi={handleExportXmi}
-        onImport={importDiagram}
         onImportXmi={handleImportXmi}
         onGenerateBackend={handleGenerateBackend}
         onFromImage={handleFromImage}

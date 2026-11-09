@@ -95,6 +95,10 @@ function buildEntityRelations(entity, allEntities, allRelationships) {
   const results = [];
 
   for (const rel of allRelationships) {
+    // La herencia se mapea con @Inheritance/@PrimaryKeyJoinColumn.
+    // No debe generar ademas @OneToOne/@ManyToOne entre padre e hijo.
+    if (rel.type === 'INHERITANCE') continue;
+
     const fromName = relFromName(rel, allEntities);
     const toName = relToName(rel, allEntities);
     const isSource = fromName === entityName;
@@ -209,29 +213,38 @@ function buildEntityRelations(entity, allEntities, allRelationships) {
 }
 
 // Clasifica la entidad en la jerarquia de herencia (o null si no hereda).
-// - Hijo (es target de INHERITANCE): { parentEntity } -> la plantilla emite
+// - Hijo (source de INHERITANCE): { parentEntity } -> la plantilla emite
 //   `extends Padre` + @PrimaryKeyJoinColumn, SIN @Inheritance.
-// - Raiz (es source, tiene hijos): { isRoot: true } -> la plantilla emite
-//   @Inheritance(JOINED) + @DiscriminatorColumn.
+// - Raiz (target de INHERITANCE, tiene hijos): { isRoot: true } -> la
+//   plantilla emite @Inheritance(JOINED) + @DiscriminatorColumn.
 // JPA exige UNA sola estrategia por jerarquia: @Inheritance en el hijo
 // rompe el arranque en PostgreSQL ("may not override SINGLE_TABLE").
 function buildInheritanceInfo(entity, allEntities, allRelationships) {
   // ¿Es hijo? (tiene relación INHERITANCE donde él es el target)
-  const parentRel = allRelationships.find(
-    r => r.type === 'INHERITANCE' && relToName(r, allEntities) === entity.name
+  const childRel = allRelationships.find(
+    r => r.type === 'INHERITANCE' && relFromName(r, allEntities) === entity.name
   );
   // ¿Es raíz? (tiene hijos, es decir INHERITANCE donde él es el source)
   const hasChildren = allRelationships.some(
-    r => r.type === 'INHERITANCE' && relFromName(r, allEntities) === entity.name
+    r => r.type === 'INHERITANCE' && relToName(r, allEntities) === entity.name
   );
 
-  if (parentRel) {
-    // Hijo: solo extends + @PrimaryKeyJoinColumn (NO @Inheritance)
-    const parentName = relFromName(parentRel, allEntities);
+  if (childRel) {
+    // Hijo: solo extends + @PrimaryKeyJoinColumn (NO @Inheritance, NO @Id).
+    const parentName = relToName(childRel, allEntities);
+    const parentEntity = (allEntities || []).find(e => e.name === parentName);
+    const parentPk = parentEntity
+      ? (parentEntity.attributes || []).find(a => a.isPk)
+      : null;
+    const parentPkColumn = parentPk ? toSnakeCase(parentPk.name, 'id') : 'id';
+    const parentTable = (parentEntity && parentEntity.tableName) || snakeCase(parentName);
     return {
       isRoot: false,
       parentEntity: parentName,
       parentEntityPascal: toJavaClassName(parentName),
+      parentTable,
+      parentPkColumn,
+      parentPkJoinColumn: `${parentTable}_${parentPkColumn}`,
     };
   }
 
@@ -249,8 +262,12 @@ function buildInheritanceInfo(entity, allEntities, allRelationships) {
 // PK + atributos (sin PK repetida ni colisiones FK) + campos de relaciones.
 // Cada entrada es { javaType, name }. Si falta un campo aqui, el test
 // getters-setters.test.js lo detecta (cuenta getters >= campos).
-function buildModelAccessors(primaryKey, mappedAttributes, relations) {
-  const accessors = [{ javaType: primaryKey.javaType, name: primaryKey.nameCamel }];
+function buildModelAccessors(primaryKey, mappedAttributes, relations, inheritance) {
+  const accessors = [];
+  // El hijo hereda la PK del padre; no debe declarar otro campo @Id.
+  if (!inheritance || !inheritance.parentEntity) {
+    accessors.push({ javaType: primaryKey.javaType, name: primaryKey.nameCamel });
+  }
   for (const attr of mappedAttributes || []) {
     if (attr.isPk || attr.isFkCollision) continue;
     accessors.push({ javaType: attr.javaType, name: attr.nameCamel });

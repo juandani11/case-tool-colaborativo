@@ -169,7 +169,7 @@
 **Objetivo:** identidad con degradación elegante a modo abierto.
 
 ```
-Visitante → login/page.tsx → AuthContext.login()
+Ingeniero de Software → login/page.tsx → AuthContext.login()
   → POST /api/auth/login {username,password}          (routes/auth.js)
   → userService.verifyPassword (bcrypt.compare)       (services/userService.js)
   → signToken({userId,username}, 7d)                  (middleware/auth.js)

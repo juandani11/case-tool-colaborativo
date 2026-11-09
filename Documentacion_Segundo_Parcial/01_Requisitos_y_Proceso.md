@@ -45,12 +45,11 @@ Además, se consolidan la autenticación, las ACL, el dashboard, la edición col
 
 ## 2.1. Captura de Requisitos
 
-La captura se realizó con entrevistas, observación del flujo de modelado y análisis de los incidentes detectados durante las pruebas colaborativas. Los actores se consolidaron en tres roles de negocio; los roles técnicos `OWNER`, `EDITOR` y `VIEWER` son especializaciones de autorización, no actores UML independientes.
+La captura se realizó con entrevistas, observación del flujo de modelado y análisis de los incidentes detectados durante las pruebas colaborativas. Los actores se consolidaron en dos roles de negocio; los roles técnicos `OWNER`, `EDITOR` y `VIEWER` son especializaciones de autorización, no actores UML independientes.
 
 | Actor | Tipo | Descripción | Casos de uso |
 |---|---|---|---|
-| Visitante | Primario | Persona no autenticada que accede al sistema para registrarse o iniciar sesión | CU-01 |
-| Ingeniero de Software | Primario | Usuario autenticado que crea, edita, comparte, asiste con IA y genera backends | CU-02 a CU-08 |
+| Ingeniero de Software | Primario | Usuario autenticado que se registra, inicia sesion, crea, edita, comparte, asiste con IA y genera backends | CU-01 a CU-08 |
 | Colaborador | Primario | Miembro invitado con permisos de edición o solo lectura sobre un diagrama | CU-03, CU-05, CU-06 |
 | Asistente IA | Secundario | Servicio que clasifica intención, responde y propone mutaciones | CU-06 |
 | Groq | Externo | Proveedor de modelos de texto, voz y visión | CU-06 |
@@ -61,7 +60,6 @@ La captura se realizó con entrevistas, observación del flujo de modelado y an�
 
 ```mermaid
 flowchart LR
-    V["Visitante"] --> CU01(["CU-01 Autenticarse"])
     I["Ingeniero de Software"] --> CU01
     I --> CU02(["CU-02 Gestionar diagramas"])
     I --> CU03(["CU-03 Editar colaborativamente"])
@@ -73,11 +71,6 @@ flowchart LR
     C["Colaborador"] --> CU03
     C --> CU05
     C --> CU06
-    IA["Asistente IA"] -.-> CU06
-    G["Groq"] -.-> CU06
-    DB["PostgreSQL/Neon"] -.-> CU02
-    DB -.-> CU03
-    DB -.-> CU06
 ```
 
 **Reglas de captura relevantes para CU-06:**
@@ -131,7 +124,7 @@ flowchart LR
 
 | ID | Caso de uso | Actor principal | Prioridad | Resultado |
 |---|---|---|---|---|
-| CU-01 | Autenticarse en el sistema | Visitante | Alta | Sesión JWT activa |
+| CU-01 | Autenticarse en el sistema | Ingeniero de Software | Alta | Sesión JWT activa |
 | CU-02 | Gestionar diagramas | Ingeniero de Software | Alta | Diagrama creado, listado, renombrado o eliminado |
 | CU-03 | Editar diagrama colaborativamente | Ingeniero de Software / Colaborador | Alta | Grafo Yjs actualizado y sincronizado |
 | CU-04 | Gestionar miembros y permisos | Ingeniero de Software (`OWNER`) | Alta | ACL actualizada |
@@ -146,7 +139,7 @@ Las especificaciones siguen el formato de Jacobson: identificador, nombre, actor
 
 | Código | Nombre | Actores | Precondición | Postcondición | Flujo principal | Flujos alternativos |
 |---|---|---|---|---|---|---|
-| CU-01 | Autenticarse en el sistema | Visitante; AuthService; PostgreSQL | Backend disponible; `AUTH_ENABLED=true` para el flujo completo | Sesión JWT activa o error informado | 1. Abrir `/login` o `/register`. 2. Ingresar credenciales. 3. Enviar `POST /api/auth/login` o `/register`. 4. Validar entrada. 5. Comparar/generar bcrypt. 6. Firmar JWT. 7. Guardar token. 8. Redirigir al dashboard. | 4a. Datos inválidos: `400`. 5a. Credenciales incorrectas: `401`. 6a. Usuario/email duplicado: `400`. 7a. Backend caído: no se crea sesión; se informa error. |
+| CU-01 | Autenticarse en el sistema | Ingeniero de Software; AuthService; PostgreSQL | Backend disponible; `AUTH_ENABLED=true` para el flujo completo | Sesión JWT activa o error informado | 1. Abrir `/login` o `/register`. 2. Ingresar credenciales. 3. Enviar `POST /api/auth/login` o `/register`. 4. Validar entrada. 5. Comparar/generar bcrypt. 6. Firmar JWT. 7. Guardar token. 8. Redirigir al dashboard. | 4a. Datos inválidos: `400`. 5a. Credenciales incorrectas: `401`. 6a. Usuario/email duplicado: `400`. 7a. Backend caído: no se crea sesión; se informa error. |
 | CU-02 | Gestionar diagramas | Ingeniero de Software; DiagramService; PostgreSQL | Sesión JWT válida | Diagrama creado, listado, renombrado o eliminado con ACL consistente | 1. Abrir dashboard. 2. `GET /api/diagrams`. 3. Mostrar `owned/shared`. 4. Crear con `POST /api/diagrams`. 5. Insertar diagrama + ACL `OWNER` en una transacción. 6. Abrir editor. 7. Renombrar o eliminar según rol. | 5a. Falla la transacción: `ROLLBACK`. 7a. `VIEWER` intenta borrar: `403`. 7b. Diagrama inexistente: `404`. 7c. Borrado: ACL + diagrama en transacción. |
 | CU-03 | Editar diagrama colaborativamente | Ingeniero de Software; Colaborador; Yjs | Membresía en el diagrama; fila en `core.diagrams` | Grafo Yjs actualizado, sincronizado y snapshot programado | 1. Abrir `/diagram/:id`. 2. Cargar metadatos y chat. 3. Conectar WebSocket. 4. Pausar socket, validar JWT/ACL y esperar snapshot. 5. Ejecutar `setupWSConnection`. 6. Editar nodo/arista. 7. Yjs propaga el update. 8. Persistir snapshot con debounce. | 3a. Token inválido: `4401`. 3b. Sin rol: `4403`. 3c. Diagrama inexistente: `4404`. 4a. Snapshot corrupto: `1011`. 6a. `VIEWER`: UI de solo lectura. 7a. Corte de red: reconexión y re-sync. |
 | CU-04 | Gestionar miembros y permisos | Ingeniero de Software (`OWNER`); Usuario invitado; ACLService | El actor es `OWNER` del diagrama | ACL actualizada con un rol válido o error | 1. Abrir `MembersPanel`. 2. Buscar username. 3. Seleccionar `EDITOR` o `VIEWER`. 4. `POST /api/diagrams/:id/members`. 5. Validar UUID y rol. 6. Upsert en `auth.diagram_acl`. 7. Recargar miembros. | 2a. Usuario inexistente: `404`. 3a. Rol inválido: `400`. 5a. Owner intenta agregarse: `400`. 6a. Owner intenta autoeliminarse: `400`. 6b. Miembro se elimina a sí mismo: permitido. |
@@ -159,11 +152,8 @@ Las especificaciones siguen el formato de Jacobson: identificador, nombre, actor
 
 ```mermaid
 flowchart LR
-    V["Visitante"]
     I["Ingeniero de Software"]
     C["Colaborador"]
-    IA["Asistente IA"]
-    G["Groq"]
 
     subgraph SISTEMA["Herramienta CASE Colaborativa con IA"]
         CU01(["CU-01 Autenticarse"])
@@ -175,8 +165,6 @@ flowchart LR
         CU07(["CU-07 Generar backend"])
         CU08(["CU-08 Consultar manual"])
     end
-
-    V --> CU01
     I --> CU01
     I --> CU02
     I --> CU03
@@ -188,8 +176,6 @@ flowchart LR
     C --> CU03
     C --> CU05
     C --> CU06
-    IA -.-> CU06
-    G -.-> CU06
 ```
 
 La IA y Groq son actores secundarios: participan en CU-06, pero no inician el caso de uso. El Ingeniero de Software inicia la interacción y el backend coordina a los participantes externos.
@@ -220,7 +206,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    V((Visitante)) --- CU01([CU-01: Autenticarse])
+    I((Ingeniero de Software)) --- CU01([CU-01: Autenticarse])
 ```
 
 **Objetivo:** establecer una identidad verificable para acceder a diagramas y a la IA.
@@ -229,7 +215,7 @@ flowchart LR
 
 **Flujo principal:**
 
-1. El visitante abre `/register` o `/login`.
+1. El Ingeniero de Software abre `/register` o `/login`.
 2. Ingresa username, email y contraseña, o username y contraseña.
 3. El frontend llama a `POST /api/auth/register` o `POST /api/auth/login`.
 4. El backend valida los datos.
