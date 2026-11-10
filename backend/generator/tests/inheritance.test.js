@@ -90,6 +90,7 @@ async function main() {
     check(/@Inheritance\(strategy = InheritanceType\.JOINED\)/.test(parent), 'Account: @Inheritance(JOINED)');
     check(!/extends\s+\w+/.test(parent), 'Account: no extiende de otra entidad');
     check(!/@OneToOne/.test(parent), 'Account: sin @OneToOne hacia hijos');
+    check(!/@OneToMany|@ManyToOne/.test(parent), 'Account: sin asociaciones derivadas de herencia');
     check(!/@GeneratedValue/.test(parent), 'Account: PK String natural sin @GeneratedValue');
     check(/@Id/.test(parent), 'Account: conserva @Id');
 

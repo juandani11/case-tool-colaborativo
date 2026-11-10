@@ -52,12 +52,20 @@ function relToName(rel, allEntities) {
   return rel.toEntity || relEndName(rel.target, allEntities);
 }
 
+// Tolera diagramas viejos que guardaron el tipo visual ("inheritance") o
+// el nombre UML ("GENERALIZATION") en lugar del tipo semántico canónico.
+function isInheritanceRel(rel) {
+  const type = String(rel && rel.type || '').trim().toUpperCase();
+  return type === 'INHERITANCE' || type === 'GENERALIZATION';
+}
+
 // ¿Esta relacion es * a *? Vale el tipo explicito MANY_TO_MANY o que
 // AMBOS extremos sean "muchos". Si es true, expandManyToMany() la reemplaza
 // por una intermedia + dos * a 1 (jamas se emite @ManyToMany).
 function isManyToManyRel(rel) {
   if (!rel) return false;
-  if (rel.type === 'MANY_TO_MANY') return true;
+  if (isInheritanceRel(rel)) return false;
+  if (String(rel.type || '').toUpperCase() === 'MANY_TO_MANY') return true;
   return isManySide(rel.cardinalityFrom) && isManySide(rel.cardinalityTo);
 }
 
@@ -197,4 +205,4 @@ function generateConfigJson(entityContexts) {
 }
 
 
-module.exports = { resolveCardinality, isManySide, relEndName, relFromName, relToName, isManyToManyRel, toLowerFirst, expandManyToMany, generateConfigJson };
+module.exports = { resolveCardinality, isManySide, relEndName, relFromName, relToName, isInheritanceRel, isManyToManyRel, toLowerFirst, expandManyToMany, generateConfigJson };

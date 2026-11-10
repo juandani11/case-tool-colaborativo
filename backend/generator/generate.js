@@ -9,7 +9,7 @@ const {
   snakeCase, pascalCase, camelCase, toJavaClassName, toJavaFieldName, toSnakeCase, toPluralRoute, isValidJavaIdentifier,
 } = require('./naming');
 const {
-  resolveCardinality, isManySide, relFromName, relToName, isManyToManyRel, expandManyToMany, generateConfigJson,
+  resolveCardinality, isManySide, relFromName, relToName, isInheritanceRel, isManyToManyRel, expandManyToMany, generateConfigJson,
 } = require('./expander');
 const {
   sanitizeEntities, normalizeRelationshipEndpoints, buildEntityLookup, buildEntityRelations,
@@ -104,10 +104,10 @@ function generateProject(ast) {
 
         // Check if this entity is a parent (has children)
         const isParent = relationships.some(
-          r => r.type === 'INHERITANCE' && relToName(r, entities) === entity.name
+          r => isInheritanceRel(r) && relToName(r, entities) === entity.name
         );
         const children = relationships
-          .filter(r => r.type === 'INHERITANCE' && relToName(r, entities) === entity.name)
+          .filter(r => isInheritanceRel(r) && relToName(r, entities) === entity.name)
           .map(r => ({
             childEntity: relFromName(r, entities),
             childEntityPascal: toJavaClassName(relFromName(r, entities)),

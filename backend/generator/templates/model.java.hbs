@@ -51,6 +51,7 @@ public class {{entityNamePascal}} {{#if inheritance.parentEntity}}extends {{inhe
     {{/each}}
 
 {{#each relations}}
+{{#unless (eq relationshipType "INHERITANCE")}}
 {{#if (eq jpaType "manyToOne")}}
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "{{fkColumn}}")
@@ -73,6 +74,7 @@ public class {{entityNamePascal}} {{#if inheritance.parentEntity}}extends {{inhe
     private {{otherEntityPascal}} {{fieldLabel}};
 
 {{/if}}
+{{/unless}}
 {{! NOTA: no se genera @ManyToMany en ningún caso. Las relaciones * a * }}
 {{! se expanden a entidad intermedia explícita (ver expandManyToMany en }}
 {{! generate.js y entity-intermediate.java.hbs). }}

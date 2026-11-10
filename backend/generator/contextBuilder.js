@@ -2,7 +2,7 @@
 
 const { getSqlType, getJavaType } = require('./typeMapper');
 const { snakeCase, camelCase, toJavaClassName, toJavaFieldName, toSnakeCase, toPluralRoute } = require('./naming');
-const { relFromName, relToName, resolveCardinality } = require('./expander');
+const { relFromName, relToName, resolveCardinality, isInheritanceRel } = require('./expander');
 
 // Convierte nombres visibles ("Order Details") en identificadores Java
 // validos ("OrderDetails"); el visible se conserva en `originalName`.
@@ -97,7 +97,8 @@ function buildEntityRelations(entity, allEntities, allRelationships) {
   for (const rel of allRelationships) {
     // La herencia se mapea con @Inheritance/@PrimaryKeyJoinColumn.
     // No debe generar ademas @OneToOne/@ManyToOne entre padre e hijo.
-    if (rel.type === 'INHERITANCE') continue;
+    // Acepta también "GENERALIZATION" o el tipo visual "inheritance".
+    if (isInheritanceRel(rel)) continue;
 
     const fromName = relFromName(rel, allEntities);
     const toName = relToName(rel, allEntities);
@@ -195,7 +196,7 @@ function buildEntityRelations(entity, allEntities, allRelationships) {
       dtoFkTaken,
       isOwner,
       mappedBy,
-      relationshipType: rel.type,
+      relationshipType: isInheritanceRel(rel) ? 'INHERITANCE' : rel.type,
       cardinalityFrom: cardFrom,
       cardinalityTo: cardTo,
       isSource,
@@ -222,11 +223,11 @@ function buildEntityRelations(entity, allEntities, allRelationships) {
 function buildInheritanceInfo(entity, allEntities, allRelationships) {
   // ¿Es hijo? (tiene relación INHERITANCE donde él es el target)
   const childRel = allRelationships.find(
-    r => r.type === 'INHERITANCE' && relFromName(r, allEntities) === entity.name
+    r => isInheritanceRel(r) && relFromName(r, allEntities) === entity.name
   );
   // ¿Es raíz? (tiene hijos, es decir INHERITANCE donde él es el source)
   const hasChildren = allRelationships.some(
-    r => r.type === 'INHERITANCE' && relToName(r, allEntities) === entity.name
+    r => isInheritanceRel(r) && relToName(r, allEntities) === entity.name
   );
 
   if (childRel) {
