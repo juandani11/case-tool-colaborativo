@@ -37,7 +37,7 @@ export default function LoginPage() {
         <div className="flex justify-center">
           <AppLogo size="lg" showSubtitle={false} />
         </div>
-        <h1 className="text-xl font-bold text-center text-gray-900">Iniciar sesion</h1>
+        <h1 className="text-xl font-bold text-center text-gray-900">Iniciar sesión</h1>
         {error && (
           <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{error}</div>
         )}
@@ -51,7 +51,7 @@ export default function LoginPage() {
         />
         <input
           type="password"
-          placeholder="Contrasena"
+          placeholder="Contraseña"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className={`w-full ${DS.input.base}`}

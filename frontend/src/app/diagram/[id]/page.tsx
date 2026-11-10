@@ -134,6 +134,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     provider: aiConfig.provider,
     ollamaUrl: aiConfig.ollamaUrl,
     ollamaModel: aiConfig.ollamaModel,
+    connectedUsers,
     addNode,
     updateNode,
     removeNode,

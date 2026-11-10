@@ -24,7 +24,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     if (password !== confirm) {
-      setError('Las contrasenas no coinciden');
+      setError('Las contraseñas no coinciden');
       return;
     }
     setLoading(true);
@@ -50,7 +50,7 @@ export default function RegisterPage() {
         )}
         <input
           type="text"
-          placeholder="Usuario (minimo 3 caracteres)"
+          placeholder="Usuario (mínimo 3 caracteres)"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className={`w-full ${DS.input.base}`}
@@ -66,7 +66,7 @@ export default function RegisterPage() {
         />
         <input
           type="password"
-          placeholder="Contrasena (minimo 6 caracteres)"
+          placeholder="Contraseña (mínimo 6 caracteres)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className={`w-full ${DS.input.base}`}
@@ -74,7 +74,7 @@ export default function RegisterPage() {
         />
         <input
           type="password"
-          placeholder="Confirmar contrasena"
+          placeholder="Confirmar contraseña"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           className={`w-full ${DS.input.base}`}
@@ -90,7 +90,7 @@ export default function RegisterPage() {
         <p className="text-sm text-center text-gray-600">
           ¿Ya tienes cuenta?{' '}
           <Link href="/login" className="text-blue-600 hover:underline">
-            Iniciar sesion
+            Iniciar sesión
           </Link>
         </p>
       </form>

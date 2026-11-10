@@ -5,7 +5,9 @@ import { ChatMessage } from '../hooks/useCollaborativeFlow';
 import { AiProvider } from '../types/diagram';
 import { AiConfig } from '../hooks/useAiProvider';
 import AiConfigModal from './AiConfigModal';
+import { BotIcon } from './Icons';
 import { dedupeChatMessages } from '../utils/chatMessage';
+import { mentionsUser } from '../utils/chatMentions';
 
 // UI del asistente de IA: historial + input de texto + microfono. Pura vista:
 // la logica vive en useAICommand (texto/voz/imagen). Los mensajes llegan por
@@ -222,7 +224,7 @@ function ChatPanelInner({
       >
         {visibleMessages.length === 0 && !isProcessing && (
           <div className="text-center text-gray-400 text-xs mt-8">
-            Escribe un comando para comenzar.
+            Escribe un comando o usa @usuario para chatear.
           </div>
         )}
         {visibleMessages.map((msg) => {
@@ -236,6 +238,7 @@ function ChatPanelInner({
                 !!msg.author &&
                 msg.author === currentUsername));
           const author = msg.author || (isAI ? 'Asistente' : 'Usuario');
+          const isMentionForMe = msg.sender === 'user' && mentionsUser(msg.text, currentUsername);
 
           if (msg.sender === 'system') {
             return (
@@ -253,7 +256,7 @@ function ChatPanelInner({
                     className="w-6 h-6 rounded-full bg-violet-100 border border-violet-200 flex items-center justify-center text-[11px] flex-shrink-0"
                     aria-hidden="true"
                   >
-                    🤖
+                    <BotIcon className="h-4 w-4 text-violet-600" />
                   </div>
                 ) : (
                   <div
@@ -273,8 +276,11 @@ function ChatPanelInner({
                   {isOwn ? 'Tú' : isAI ? 'Asistente' : author}
                 </span>
                 <div
+                  title={isMentionForMe ? 'Te mencionaron en este mensaje' : undefined}
                   className={`px-3 py-2 rounded-xl border text-xs leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] max-w-full ${
-                    isAI
+                    isMentionForMe
+                      ? 'bg-amber-50 border-amber-300 text-amber-950 rounded-bl-sm ring-2 ring-amber-200'
+                      : isAI
                       ? 'bg-violet-50 border-violet-200 text-violet-900 rounded-bl-sm'
                       : isOwn
                       ? 'bg-blue-50 border-blue-200 text-blue-900 rounded-br-sm'
@@ -294,12 +300,13 @@ function ChatPanelInner({
               className="w-6 h-6 rounded-full bg-violet-100 border border-violet-200 flex items-center justify-center text-[11px] flex-shrink-0"
               aria-hidden="true"
             >
-              🤖
+              <BotIcon className="h-4 w-4 text-violet-600" />
             </div>
             <div className="flex flex-col min-w-0 max-w-[85%] items-start">
               <span className="text-[10px] font-medium text-violet-600 mb-0.5">Asistente</span>
               <div className="px-3 py-2 rounded-xl rounded-bl-sm border bg-violet-50 border-violet-200 text-violet-900 text-xs flex items-center gap-1.5">
-                <span>🤖 Asistente está pensando</span>
+                <BotIcon className="h-3.5 w-3.5" />
+                <span>Asistente está pensando</span>
                 <span className="inline-flex items-center gap-0.5" aria-hidden="true">
                   {[0, 1, 2].map((index) => (
                     <span
@@ -333,7 +340,7 @@ function ChatPanelInner({
                 handleSend();
               }
             }}
-            placeholder={isProcessing ? 'La IA está pensando...' : isRecording ? 'Grabando...' : 'Comando IA...'}
+            placeholder={isProcessing ? 'La IA está pensando...' : isRecording ? 'Grabando...' : 'Escribe un comando o usa @usuario para chatear...'}
             rows={1}
             className="flex-1 bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-blue-400 transition-colors min-w-0 resize-none min-h-[32px] max-h-[120px] disabled:bg-gray-100 disabled:text-gray-400"
             style={{ height: 'auto', overflowY: 'hidden' }}

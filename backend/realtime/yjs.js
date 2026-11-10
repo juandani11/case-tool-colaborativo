@@ -55,6 +55,42 @@ async function ensureDocumentReady(docName) {
   return doc;
 }
 
+async function flushDiagramSnapshot(diagramId) {
+  const safeId = String(diagramId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safeId) return false;
+
+  const roomName = `diagram-room-${safeId}`;
+  const ydoc = docs.get(roomName);
+  if (!ydoc || ydoc.snapshotError) return false;
+
+  if (ydoc.readyPromise) await ydoc.readyPromise;
+  if (ydoc.snapshotError) return false;
+
+  const timer = snapshotTimers.get(roomName);
+  if (timer) {
+    clearTimeout(timer);
+    snapshotTimers.delete(roomName);
+  }
+
+  try {
+    await diagramService.saveSnapshot(safeId, Y.encodeStateAsUpdate(ydoc));
+    return true;
+  } catch (err) {
+    scheduleSnapshot(roomName, ydoc, safeId);
+    throw err;
+  }
+}
+
+function readFlushControl(raw) {
+  if (!Buffer.isBuffer(raw) || raw.length === 0 || raw[0] !== 0x7b) return null;
+  try {
+    const data = JSON.parse(raw.toString('utf8'));
+    return data?.type === 'flush-snapshot' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 setPersistence({
   provider: null,
   bindState: async (docName, ydoc) => {
@@ -215,6 +251,24 @@ function attachRealtime(server) {
 
     if (ws.readyState !== WebSocket.OPEN) return;
 
+    ws.on('message', (raw) => {
+      const control = readFlushControl(raw);
+      if (!control) return;
+
+      const requestedId = typeof control.diagramId === 'string' ? control.diagramId : diagramId;
+      if (!requestedId || requestedId !== diagramId) return;
+
+      flushDiagramSnapshot(diagramId)
+        .then((ok) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'flush-ack', diagramId, ok }));
+          }
+        })
+        .catch((err) => {
+          console.error(`No se pudo forzar el guardado de ${diagramId}:`, err.message);
+        });
+    });
+
     setupWSConnection(ws, req, { docName: roomName, gc: false });
     ws.resume();
   });
@@ -222,4 +276,4 @@ function attachRealtime(server) {
   return { wss, shutdown: () => shutdownRealtime(wss) };
 }
 
-module.exports = { attachRealtime, emitChatMessage, flushSnapshots };
+module.exports = { attachRealtime, emitChatMessage, flushDiagramSnapshot, flushSnapshots };

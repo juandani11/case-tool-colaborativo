@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { MANUAL_SECTIONS } from '../data/manual';
 import ReactMarkdown from 'react-markdown';
+import { BookIcon, CloseIcon } from './Icons';
 
 // Manual de usuario embebido: indice lateral + buscador (titulo y contenido)
 // + render Markdown. Cierra con Escape, click-fuera (el overlay) y la X;
@@ -48,15 +49,15 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">📘</span>
+            <BookIcon className="h-6 w-6 text-blue-600" />
             <h2 className="text-xl font-bold">Manual de Usuario</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl leading-none px-2"
+            className="text-gray-500 hover:text-gray-700 leading-none p-1 rounded hover:bg-gray-100"
             aria-label="Cerrar manual"
           >
-            ✕
+            <CloseIcon className="h-5 w-5" />
           </button>
         </div>
 
@@ -82,7 +83,9 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                       : 'hover:bg-gray-100'
                   }`}
                 >
-                  <span>{section.icon}</span>
+                  <span className="inline-flex h-6 min-w-9 items-center justify-center rounded bg-gray-200 px-1 text-[10px] font-semibold text-gray-600">
+                    {section.icon}
+                  </span>
                   <span>{section.title}</span>
                 </button>
               ))}

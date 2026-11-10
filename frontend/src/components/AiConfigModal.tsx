@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AiProvider } from '../types/diagram';
 import { AiConfig, DEFAULT_AI_CONFIG } from '../hooks/useAiProvider';
 import { apiFetch, API_BASE } from '../lib/apiClient';
+import { WarningIcon } from './Icons';
 
 interface AiConfigModalProps {
   aiConfig: AiConfig;
@@ -147,7 +148,8 @@ export default function AiConfigModal({
                 className="text-[11px] leading-relaxed text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mb-3"
                 title="En la nube, localhost apunta al servidor de Vercel/Railway, no a tu equipo. Expón Ollama con Ngrok y usa la URL pública."
               >
-                ⚠️ En la nube, <code className="font-mono">localhost</code> no funciona. Para usar Ollama, expón tu puerto con Ngrok y pega la URL pública aquí.
+                <WarningIcon className="mr-1 inline h-3 w-3 -mt-0.5" />
+                En la nube, <code className="font-mono">localhost</code> no funciona. Para usar Ollama, expón tu puerto con Ngrok y pega la URL pública aquí.
               </p>
             )}
 

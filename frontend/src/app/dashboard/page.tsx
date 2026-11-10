@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -11,10 +11,11 @@ import { HelpModal } from '../../components/HelpModal';
 import { useHelpModal } from '../../hooks/useHelpModal';
 import AccessRequestsSection from '../../components/dashboard/AccessRequestsSection';
 import DashboardDialog from '../../components/dashboard/DashboardDialog';
+import { ArrowRightIcon, HelpCircleIcon } from '../../components/Icons';
 import { AccessRequest, AccessRole, DiagramSummary, DialogState } from '../../types/dashboard';
 
 // Dashboard: lista owned/shared (GET /api/diagrams), buscador local, crear,
-// renombrar y eliminar. Las cards delegan las acciones rÃ¡pidas aquÃ­.
+// renombrar y eliminar. Las cards delegan las acciones rápidas aquí.
 export default function DashboardPage() {
   const { user, loading: authLoading, authEnabled, logout } = useAuth();
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   const [dialogBusy, setDialogBusy] = useState(false);
   const help = useHelpModal();
 
-  // Redirigir a login si no hay sesiÃ³n y auth estÃ¡ activo
+  // Redirigir a login si no hay sesión y auth está activo
   useEffect(() => {
     if (!authLoading && authEnabled && !user) {
       router.push('/login');
@@ -186,7 +187,7 @@ export default function DashboardPage() {
     const needsName = dialog.mode === 'create' || dialog.mode === 'rename';
     const name = dialogName.trim();
     if (needsName && !name) {
-      setDialogError('El nombre no puede estar vacÃ­o.');
+      setDialogError('El nombre no puede estar vacío.');
       return;
     }
     if (needsName && name.length > 120) {
@@ -284,10 +285,11 @@ export default function DashboardPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={help.open}
-              className={`${DS.button.base} text-sm ${DS.button.ghost} !py-1 !px-3`}
+              className={`${DS.button.base} text-sm ${DS.button.ghost} !py-1 !px-3 inline-flex items-center gap-1.5`}
               title="Abrir manual de usuario (F1)"
             >
-              â“ Ayuda
+              <HelpCircleIcon className="h-4 w-4" />
+              <span>Ayuda</span>
             </button>
             {user ? (
               <>
@@ -329,9 +331,13 @@ export default function DashboardPage() {
           </h2>
           {filteredOwned.length === 0 ? (
             <div className={`${DS.card.base} border-dashed p-12 text-center`}>
-              <p className="text-gray-500 mb-4">No tienes diagramas todavÃ­a.</p>
-              <button onClick={openCreate} className={`${DS.button.base} ${DS.button.primary} !py-1 !px-3`}>
-                Crear el primero â†’
+              <p className="text-gray-500 mb-4">No tienes diagramas todavía.</p>
+              <button
+                onClick={openCreate}
+                className={`${DS.button.base} ${DS.button.primary} !py-1 !px-3 inline-flex items-center gap-1.5`}
+              >
+                <span>Crear el primero</span>
+                <ArrowRightIcon className="h-4 w-4" />
               </button>
             </div>
           ) : (

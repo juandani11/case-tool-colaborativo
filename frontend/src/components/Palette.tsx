@@ -1,6 +1,17 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { EntityNodeData } from '../types/diagram';
+import {
+  AggregationIcon,
+  AssociationIcon,
+  CircleIcon,
+  CompositionIcon,
+  DiamondIcon,
+  InheritanceIcon,
+  NoteIcon,
+  SquareIcon,
+} from './Icons';
 
 // Paleta lateral con DOS modos (solo visible en modo edicion, no VIEWER):
 // - Elementos: drag-and-drop al canvas (ITEMS de abajo).
@@ -10,7 +21,7 @@ import { EntityNodeData } from '../types/diagram';
 interface PaletteItem {
   id: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
   description: string;
   defaultData: Partial<EntityNodeData>;
 }
@@ -19,28 +30,28 @@ const ITEMS: PaletteItem[] = [
   {
     id: 'class',
     label: 'Clase',
-    icon: '\u25A1',
+    icon: <SquareIcon className="h-4 w-4" />,
     description: 'Clase UML estándar',
     defaultData: { label: 'NuevaClase', attributes: [], methods: [], stereotype: 'class' },
   },
   {
     id: 'interface',
     label: 'Interfaz',
-    icon: '\u25CB',
+    icon: <CircleIcon className="h-4 w-4" />,
     description: 'Interfaz UML (<<interface>>)',
     defaultData: { label: 'NuevaInterfaz', attributes: [], methods: [], stereotype: 'interface' },
   },
   {
     id: 'abstract',
     label: 'Clase abstracta',
-    icon: '\u25C7',
+    icon: <DiamondIcon className="h-4 w-4" />,
     description: 'Clase abstracta UML',
     defaultData: { label: 'NuevaAbstracta', attributes: [], methods: [], stereotype: 'class', isAbstract: true },
   },
   {
     id: 'note',
     label: 'Nota',
-    icon: '\uD83D\uDCDD',
+    icon: <NoteIcon className="h-4 w-4" />,
     description: 'Nota de texto libre',
     defaultData: { label: 'Nota', attributes: [], methods: [], stereotype: 'class', isNote: true },
   },
@@ -49,17 +60,17 @@ const ITEMS: PaletteItem[] = [
 export interface RelationshipOption {
   id: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
   description: string;
   edgeType: string;
   relationshipType: string;
 }
 
 export const RELATIONSHIPS: RelationshipOption[] = [
-  { id: 'association', label: 'Asociación', icon: '\u2500\u2500\u2500', description: 'Relación simple', edgeType: 'association', relationshipType: 'ASSOCIATION' },
-  { id: 'inheritance', label: 'Herencia', icon: '\u2500\u2500\u25B7', description: 'Generalización', edgeType: 'inheritance', relationshipType: 'INHERITANCE' },
-  { id: 'composition', label: 'Composición', icon: '\u2500\u2500\u25C6', description: 'Composición (rombo lleno)', edgeType: 'composition', relationshipType: 'COMPOSITION' },
-  { id: 'aggregation', label: 'Agregación', icon: '\u2500\u2500\u25C7', description: 'Agregación (rombo vacío)', edgeType: 'aggregation', relationshipType: 'AGGREGATION' },
+  { id: 'association', label: 'Asociación', icon: <AssociationIcon className="h-4 w-9" />, description: 'Relación simple', edgeType: 'association', relationshipType: 'ASSOCIATION' },
+  { id: 'inheritance', label: 'Herencia', icon: <InheritanceIcon className="h-4 w-9" />, description: 'Generalización', edgeType: 'inheritance', relationshipType: 'INHERITANCE' },
+  { id: 'composition', label: 'Composición', icon: <CompositionIcon className="h-4 w-9" />, description: 'Composición (rombo lleno)', edgeType: 'composition', relationshipType: 'COMPOSITION' },
+  { id: 'aggregation', label: 'Agregación', icon: <AggregationIcon className="h-4 w-9" />, description: 'Agregación (rombo vacío)', edgeType: 'aggregation', relationshipType: 'AGGREGATION' },
 ];
 
 interface PaletteProps {
@@ -86,13 +97,13 @@ export default function Palette({
   if (collapsed) return null;
 
   return (
-    <aside className="w-52 bg-white border-r border-gray-200 p-3 overflow-y-auto flex-shrink-0">
+    <aside className="w-52 bg-white border-r border-gray-200 p-3 overflow-y-auto flex-shrink-0 text-gray-900">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs uppercase font-semibold text-gray-500">Paleta</span>
+        <span className="text-xs uppercase font-semibold text-gray-600">Paleta</span>
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
           title="Ocultar paleta"
           aria-label="Ocultar paleta"
         >
@@ -103,7 +114,7 @@ export default function Palette({
       </div>
 
       <section className="border-b border-gray-200 pb-3 mb-3">
-        <h3 className="text-xs uppercase font-semibold text-gray-500 mb-2">
+        <h3 className="text-xs uppercase font-semibold text-gray-600 mb-2">
           Elementos
         </h3>
         <div className="space-y-1">
@@ -112,10 +123,12 @@ export default function Palette({
               key={item.id}
               draggable
               onDragStart={(e) => handleDragStart(e, item)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded hover:bg-gray-100 cursor-grab active:cursor-grabbing text-sm"
+              className="flex select-none items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-gray-800 cursor-grab hover:bg-gray-100 active:cursor-grabbing active:bg-gray-200"
               title={item.description}
             >
-              <span className="w-6 flex-shrink-0 text-center text-lg leading-none">{item.icon}</span>
+              <span className="flex w-6 flex-shrink-0 items-center justify-center text-gray-700">
+                {item.icon}
+              </span>
               <span className="min-w-0 truncate">{item.label}</span>
             </div>
           ))}
@@ -123,7 +136,7 @@ export default function Palette({
       </section>
 
       <section>
-        <h3 className="text-xs uppercase font-semibold text-gray-500 mb-2">
+        <h3 className="text-xs uppercase font-semibold text-gray-600 mb-2">
           Relaciones
         </h3>
         <div className="space-y-1">
@@ -133,14 +146,16 @@ export default function Palette({
               type="button"
               onClick={() => onSelectRelationType(activeRelationType === rel.id ? null : rel.id)}
               aria-pressed={activeRelationType === rel.id}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded text-left text-sm transition-colors ${
+              className={`flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 activeRelationType === rel.id
-                  ? 'bg-blue-100 text-blue-700 font-medium'
-                  : 'hover:bg-gray-100 text-gray-700'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'text-gray-800 hover:bg-gray-100 active:bg-gray-200'
               }`}
               title={rel.description}
             >
-              <span className="w-6 flex-shrink-0 text-center font-mono text-base leading-none">{rel.icon}</span>
+              <span className="flex w-9 flex-shrink-0 items-center justify-center text-gray-700">
+                {rel.icon}
+              </span>
               <span className="min-w-0 truncate">{rel.label}</span>
             </button>
           ))}

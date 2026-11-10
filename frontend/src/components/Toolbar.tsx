@@ -10,6 +10,7 @@ import { useHelpModal } from '../hooks/useHelpModal';
 import { ConnectedUser } from '../hooks/useCollaborativeFlow';
 import { DS } from '../styles/design-system';
 import AppLogo from './AppLogo';
+import { ArrowLeftIcon, HelpCircleIcon } from './Icons';
 
 // Barra superior del editor: acciones de diagrama (Entidad, Conexion),
 // interoperabilidad XMI, Desde imagen, Generar, Chat, Miembros, Ayuda,
@@ -85,9 +86,10 @@ export default function Toolbar({
         <button
           onClick={() => router.push('/dashboard')}
           title="Volver al dashboard"
-          className={`text-[11px] ${DS.button.ghost} !py-0.5 !px-1.5 hidden sm:inline`}
+          className={`text-[11px] ${DS.button.ghost} !py-0.5 !px-1.5 hidden sm:inline-flex items-center gap-1`}
         >
-          ← Dashboard
+          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          <span>Dashboard</span>
         </button>
       </div>
 
@@ -232,7 +234,7 @@ export default function Toolbar({
 
       {/* Help */}
       <ToolButton onClick={help.open} tooltip="Abrir manual de usuario (F1)">
-        <span>❓</span>
+        <HelpCircleIcon className="h-3.5 w-3.5" />
         <span className="hidden md:inline">Ayuda</span>
       </ToolButton>
 

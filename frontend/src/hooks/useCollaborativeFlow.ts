@@ -165,7 +165,26 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     setEdges(edgesToArray(ye));
     setMessages(dedupeChatMessages(ychat.toArray()));
 
-    // ── 3. Cleanup ──────────────────────────────────────────────────
+    // ── 3. Flush inmediato al cerrar/recargar ───────────────────────
+    // No esperamos al debounce de 2 s del servidor: pedimos por el mismo
+    // WebSocket que persista el documento de esta sala antes de irnos.
+    const requestFlush = () => {
+      const ws = provider.ws;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      try {
+        ws.send(JSON.stringify({
+          type: 'flush-snapshot',
+          diagramId: roomName.startsWith('diagram-room-')
+            ? roomName.slice('diagram-room-'.length)
+            : roomName,
+        }));
+      } catch {}
+    };
+
+    window.addEventListener('beforeunload', requestFlush);
+    window.addEventListener('pagehide', requestFlush);
+
+    // ── 4. Cleanup ──────────────────────────────────────────────────
     teardown(prevProvider, prevDoc);
 
     // IMPORTANTE: capturar referencias locales para el cleanup.
@@ -176,6 +195,8 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
     const cleanupDoc = doc;
 
     return () => {
+      window.removeEventListener('beforeunload', requestFlush);
+      window.removeEventListener('pagehide', requestFlush);
       try { yn.unobserveDeep(onNodesDeepChange); } catch {}
       try { ye.unobserveDeep(onEdgesDeepChange); } catch {}
       try { ychat.unobserve(onChatChange); } catch {}

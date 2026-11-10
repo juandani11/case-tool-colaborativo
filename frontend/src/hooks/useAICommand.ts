@@ -3,7 +3,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { nodesToAST, applyMutations } from '../utils/ast';
 import { apiFetch } from '../lib/apiClient';
+import { classifyChatMessage } from '../utils/chatMentions';
 import { AiProvider, EntityNodeData, RelationshipData, SelectedElementContext } from '../types/diagram';
+import type { ConnectedUser } from '../types/collaboration';
 import { Node, Edge } from 'reactflow';
 
 // Base del backend (misma que apiClient). Los 3 handlers comparten patron:
@@ -44,6 +46,7 @@ interface AICommandOptions {
   provider?: AiProvider;
   ollamaUrl?: string;
   ollamaModel?: string;
+  connectedUsers?: ConnectedUser[];
   addNode: (node: Node<EntityNodeData>) => void;
   updateNode: (id: string, changes: any) => void;
   removeNode: (id: string) => void;
@@ -90,10 +93,18 @@ export function useAICommand(options: AICommandOptions) {
   const sendCommandText = useCallback(async (text: string) => {
     const trimmed = (text || '').trim();
     if (!trimmed || processingRef.current) return;
+
+    const opts = optionsRef.current;
+    const target = classifyChatMessage(trimmed, opts.connectedUsers);
+    opts.addMessage('user', trimmed);
+
+    if (target.kind === 'human' && target.known) {
+      setCommand('');
+      return;
+    }
+
     processingRef.current = true;
     setIsProcessing(true);
-    const opts = optionsRef.current;
-    opts.addMessage('user', trimmed);
     try {
       const ast = nodesToAST(opts.nodes, opts.edges);
       const response = await apiFetch(`${API_BASE}/api/ai/command`, {

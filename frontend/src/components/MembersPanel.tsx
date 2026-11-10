@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useDiagramMembers } from '../hooks/useDiagramMembers';
+import { CloseIcon } from './Icons';
 
 // Vista de colaboradores: la logica de API y estado vive en useDiagramMembers.
 interface MembersPanelProps {
@@ -95,7 +96,7 @@ export default function MembersPanel({ diagramId, onClose }: MembersPanelProps) 
                         className="text-gray-300 hover:text-red-500 transition-colors text-xs px-1"
                         title="Eliminar"
                       >
-                        ✕
+                        <CloseIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ))}

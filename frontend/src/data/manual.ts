@@ -12,7 +12,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
   {
     id: 'intro',
     title: 'Introduccion',
-    icon: '📖',
+    icon: 'INT',
     content: `
 # Que es esta herramienta?
 
@@ -31,7 +31,7 @@ el diseno de bases de datos mediante diagramas de clases UML 2.5.
   {
     id: 'getting-started',
     title: 'Primeros pasos',
-    icon: '🚀',
+    icon: 'GO',
     content: `
 # Primeros pasos
 
@@ -61,7 +61,7 @@ el diseno de bases de datos mediante diagramas de clases UML 2.5.
   {
     id: 'entities',
     title: 'Entidades y atributos',
-    icon: '📦',
+    icon: 'ENT',
     content: `
 # Entidades y atributos
 
@@ -95,7 +95,7 @@ asociativa** para agregar atributos propios:
   {
     id: 'relationships',
     title: 'Relaciones UML',
-    icon: '🔗',
+    icon: 'REL',
     content: `
 # Relaciones UML 2.5
 
@@ -126,7 +126,7 @@ Para crear una relacion de una entidad consigo misma:
   {
     id: 'ai-assistant',
     title: 'Asistente de IA',
-    icon: '🤖',
+    icon: 'AI',
     content: `
 # Asistente de IA
 
@@ -162,7 +162,7 @@ como:
   {
     id: 'collaboration',
     title: 'Colaboracion en tiempo real',
-    icon: '👥',
+    icon: 'COL',
     content: `
 # Colaboracion en tiempo real
 
@@ -197,7 +197,7 @@ color y el nombre del usuario. Esto evita conflictos.
   {
     id: 'export',
     title: 'Exportar e importar',
-    icon: '📤',
+    icon: 'IO',
     content: `
 # Exportar e importar
 
@@ -221,7 +221,7 @@ color y el nombre del usuario. Esto evita conflictos.
   {
     id: 'generate',
     title: 'Generar backend',
-    icon: '⚙️',
+    icon: 'GEN',
     content: `
 # Generar backend Spring Boot
 
@@ -253,7 +253,7 @@ color y el nombre del usuario. Esto evita conflictos.
   {
     id: 'dashboard',
     title: 'Dashboard',
-    icon: '🏠',
+    icon: 'DSH',
     content: `
 # Dashboard
 
@@ -274,7 +274,7 @@ color y el nombre del usuario. Esto evita conflictos.
   {
     id: 'faq',
     title: 'Preguntas frecuentes',
-    icon: '❓',
+    icon: 'FAQ',
     content: `
 # Preguntas frecuentes
 
