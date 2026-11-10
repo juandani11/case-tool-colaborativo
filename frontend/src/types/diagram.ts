@@ -55,7 +55,7 @@ export interface EntityNodeData {
   lockedBy?: { name: string; color: string; timestamp: number };
 }
 
-export type AiProvider = 'groq' | 'ollama';
+export type AiProvider = 'groq' | 'ollama' | 'gemini';
 
 // Tipos UML 2.5 que el editor ofrece en la UI (con rombo/triángulo)
 export type UmlRelationshipType =

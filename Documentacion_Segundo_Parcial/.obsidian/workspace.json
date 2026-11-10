@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "GUIA_DEFENSA_ABSOLUTA.md",
+                "file": "CICLO_VIDA_YJS_SNAPSHOT.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "GUIA_DEFENSA_ABSOLUTA"
+              "title": "CICLO_VIDA_YJS_SNAPSHOT"
             }
           }
         ]
@@ -83,7 +83,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "8147ae5e9c17d2c2",
@@ -190,9 +191,11 @@
   },
   "active": "e1c6945bb08dad64",
   "lastOpenFiles": [
-    "MANUAL_DE_DEFENSA_EXTREMO_MEJORADO.md",
-    "GUIA_DEFENSA_ABSOLUTA.md",
     "GUIA_YJS_SNAPSHOT.md",
+    "CICLO_VIDA_YJS_SNAPSHOT.md",
+    "MANUAL_DE_DEFENSA_EXTREMO_MEJORADO.md",
+    "GUIA_DEFENSA_EXAMEN.md",
+    "GUIA_DEFENSA_ABSOLUTA.md",
     "06_Anexos_y_Glosario.md",
     "04_Diseno_UML.md",
     "03_Diseno_Arquitectura.md",

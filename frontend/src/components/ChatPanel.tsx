@@ -18,6 +18,7 @@ interface ChatPanelProps {
   command: string;
   setCommand: (value: string) => void;
   onSendCommand: () => void;
+  onCancel?: () => void;
   isProcessing: boolean;
   isRecording: boolean;
   onVoiceCommand: () => void;
@@ -64,6 +65,7 @@ function ChatPanelInner({
   command,
   setCommand,
   onSendCommand,
+  onCancel,
   isProcessing,
   isRecording,
   onVoiceCommand,
@@ -186,7 +188,7 @@ function ChatPanelInner({
               provider: event.target.value as AiProvider,
             })}
             className="ml-1 text-[10px] bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            title="Groq es rápido y requiere internet. Ollama es local y requiere que el servidor esté activo."
+            title="Groq y Gemini son rápidos y requieren internet. Ollama es local y requiere que el servidor esté activo."
             aria-label="Motor de IA"
           >
             <option value="groq">Groq (Nube)</option>
@@ -347,15 +349,19 @@ function ChatPanelInner({
             disabled={isProcessing || isRecording || readOnly}
           />
           <button
-            onClick={handleSend}
-            disabled={isProcessing || isRecording || !command.trim() || readOnly}
-            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-medium rounded-md transition-colors flex-shrink-0"
-            title="Enviar comando"
-            aria-label="Enviar comando"
+            onClick={isProcessing ? onCancel : handleSend}
+            disabled={readOnly || isRecording || (!isProcessing && !command.trim())}
+            className={`px-2.5 py-1.5 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-medium rounded-md transition-colors flex-shrink-0 ${
+              isProcessing
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+            title={isProcessing ? 'Detener operación' : 'Enviar comando'}
+            aria-label={isProcessing ? 'Detener operación' : 'Enviar comando'}
           >
             {isProcessing ? (
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="animate-spin">
-                <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="20 10" strokeLinecap="round"/>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="2.5" y="2.5" width="7" height="7" rx="1" fill="currentColor"/>
               </svg>
             ) : (
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -365,7 +371,7 @@ function ChatPanelInner({
           </button>
           <button
             onClick={onVoiceCommand}
-            disabled={isProcessing || isRecording || readOnly}
+            disabled={isProcessing || readOnly}
             className={`p-1.5 rounded-md transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
               isRecording
                 ? 'bg-red-100 text-red-600 animate-pulse'

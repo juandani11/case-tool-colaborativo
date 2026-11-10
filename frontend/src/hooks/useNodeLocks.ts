@@ -7,7 +7,8 @@ import { WebsocketProvider } from 'y-websocket';
 // y devuelve que nodo edita quien. Expira a 30 s para no dejar locks
 // colgados si un peer se cae sin limpiar. El editor pone draggable:false
 // en nodos ajenos a partir de este mapa.
-interface NodeLock {
+export interface NodeLock {
+  clientId: number;
   name: string;
   color: string;
   timestamp: number;
@@ -22,11 +23,12 @@ export function useNodeLocks(provider: WebsocketProvider | null) {
     const update = () => {
       const newLocks = new Map<string, NodeLock>();
       const now = Date.now();
-      provider.awareness.getStates().forEach((state: any) => {
+      provider.awareness.getStates().forEach((state: any, clientId: number) => {
         const editing = state.editing;
         const user = state.user;
         if (editing?.nodeId && user && now - editing.timestamp < 30000) {
           newLocks.set(editing.nodeId, {
+            clientId,
             name: user.name,
             color: user.color,
             timestamp: editing.timestamp,

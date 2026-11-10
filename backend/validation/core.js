@@ -7,7 +7,7 @@ const MAX_ENTITIES = 300;
 const MAX_RELATIONSHIPS = 600;
 const MAX_ATTRIBUTES = 100;
 const MAX_MUTATIONS = 200;
-const AI_PROVIDERS = new Set(['groq', 'ollama']);
+const AI_PROVIDERS = new Set(['groq', 'ollama', 'gemini']);
 
 const RELATIONSHIP_TYPES = new Set([
   'ASSOCIATION',

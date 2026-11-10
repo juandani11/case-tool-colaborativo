@@ -72,14 +72,16 @@ export default function AiConfigModal({
 
   const saveConfig = () => {
     const url = draftOllamaUrl.trim() || DEFAULT_AI_CONFIG.ollamaUrl;
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        throw new Error('protocol');
+    if (draftProvider === 'ollama') {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new Error('protocol');
+        }
+      } catch {
+        setConfigError('La URL de Ollama debe empezar por http:// o https://.');
+        return;
       }
-    } catch {
-      setConfigError('La URL de Ollama debe empezar por http:// o https://.');
-      return;
     }
     onAiConfigChange({
       provider: draftProvider,
@@ -109,7 +111,7 @@ export default function AiConfigModal({
           Configuración Avanzada de IA
         </h3>
         <p className="text-[11px] text-gray-500 mb-4">
-          Groq es rápido y requiere internet. Ollama es local y requiere que el servidor esté activo.
+          Groq y Gemini son rápidos y requieren internet. Ollama es local y requiere que el servidor esté activo.
         </p>
 
         <label className="block text-xs font-medium text-gray-700 mb-1" htmlFor="ai-provider-modal">
@@ -122,8 +124,16 @@ export default function AiConfigModal({
           className="w-full mb-3 px-2.5 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="groq">Groq (Nube)</option>
+          <option value="gemini">Google Gemini (Nube)</option>
           <option value="ollama">Ollama (Local)</option>
         </select>
+
+        {draftProvider === 'gemini' && (
+          <p className="text-[11px] leading-relaxed text-sky-700 bg-sky-50 border border-sky-200 rounded-md px-2 py-1.5 mb-3">
+            Gemini usa la <code className="font-mono">GEMINI_API_KEY</code> configurada en el backend.
+            No necesitas URL ni clave en el navegador.
+          </p>
+        )}
 
         {draftProvider === 'ollama' && (
           <>

@@ -1,3 +1,4 @@
+
 # Guía técnica: Snapshot de Yjs en PostgreSQL/Neon
 
 **Objetivo:** documentar cómo el estado colaborativo del lienzo (Yjs/CRDT) se serializa, se guarda como `BYTEA` en `core.diagrams` y se recupera al reconectar un cliente.

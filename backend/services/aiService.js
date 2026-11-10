@@ -7,19 +7,22 @@ const GROQ_TEXT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/v1';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
+const GEMINI_API_BASE = process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta';
+const GEMINI_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || GEMINI_TEXT_MODEL;
 
 function trimTrailingSlash(value) {
   return String(value || '').replace(/\/+$/, '');
 }
 
-// Patrón Strategy: Groq y Ollama comparten el contrato OpenAI-compatible,
-// pero cada uno resuelve base URL, modelo y autenticación.
+// Patrón Strategy: Groq y Ollama comparten el contrato OpenAI-compatible;
+// Gemini usa su propio protocolo generateContent.
 function resolveAiProvider(overrides = null) {
   const options = typeof overrides === 'string'
     ? { provider: overrides }
     : (overrides || {});
   const requested = String(options.provider || process.env.AI_PROVIDER || 'groq').trim().toLowerCase();
-  const provider = requested === 'ollama' ? 'ollama' : 'groq';
+  const provider = requested === 'ollama' || requested === 'gemini' ? requested : 'groq';
 
   if (provider === 'ollama') {
     const customUrl = options.ollamaUrl ? trimTrailingSlash(options.ollamaUrl) : null;
@@ -31,6 +34,16 @@ function resolveAiProvider(overrides = null) {
       visionModel: process.env.OLLAMA_VISION_MODEL || customModel || OLLAMA_MODEL,
       apiKey: null,
       customOllamaUrl: Boolean(customUrl),
+    };
+  }
+
+  if (provider === 'gemini') {
+    return {
+      name: 'gemini',
+      baseUrl: trimTrailingSlash(GEMINI_API_BASE),
+      textModel: GEMINI_TEXT_MODEL,
+      visionModel: GEMINI_VISION_MODEL,
+      apiKey: process.env.GEMINI_API_KEY || null,
     };
   }
 
@@ -88,6 +101,9 @@ async function getMutationsFromAI(command, currentState, imageBuffer, imageMime,
   const provider = resolveAiProvider(providerOptions);
   if (provider.name === 'groq' && !provider.apiKey) {
     throw httpError(503, 'El proveedor Groq no está configurado');
+  }
+  if (provider.name === 'gemini' && !provider.apiKey) {
+    throw httpError(503, 'El proveedor Gemini no está configurado');
   }
 
   const model = imageBuffer ? provider.visionModel : provider.textModel;
@@ -196,14 +212,37 @@ Reglas CRÍTICAS:
   let data;
   try {
     const headers = { 'Content-Type': 'application/json' };
-    if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
-    // LocalTunnel devuelve HTML de advertencia en la primera petición.
-    if (provider.name === 'ollama') headers['Bypass-Tunnel-Reminder'] = 'true';
+    let requestUrl;
+    let requestBody;
 
-    response = await fetch(`${provider.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    if (provider.name === 'gemini') {
+      const stateText = `Estado actual del diagrama:\n${JSON.stringify(currentState, null, 2)}\n\nComando del usuario: "${command}"`;
+      const parts = [];
+      if (imageBuffer) {
+        parts.push({
+          inline_data: {
+            mime_type: imageMime,
+            data: imageBuffer.toString('base64'),
+          },
+        });
+      }
+      parts.push({ text: `${systemPrompt}\n\n${stateText}` });
+      requestUrl = `${provider.baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(provider.apiKey)}`;
+      // Log sin la key para poder verificar el proveedor en Railway.
+      console.log(`[ai] Gemini -> ${provider.baseUrl}/models/${model}:generateContent`);
+      requestBody = {
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 2000,
+        },
+      };
+    } else {
+      if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+      // LocalTunnel devuelve HTML de advertencia en la primera petición.
+      if (provider.name === 'ollama') headers['Bypass-Tunnel-Reminder'] = 'true';
+      requestUrl = `${provider.baseUrl}/chat/completions`;
+      requestBody = {
         model,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -211,7 +250,13 @@ Reglas CRÍTICAS:
         ],
         temperature: 0.1,
         max_tokens: 2000,
-      }),
+      };
+    }
+
+    response = await fetch(requestUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
 
@@ -233,12 +278,22 @@ Reglas CRÍTICAS:
           : 'No se pudo conectar al motor local. Revisa la configuración.'
       );
     }
+    if (provider.name === 'gemini') {
+      throw httpError(503, 'No se pudo conectar con Google Gemini. Verifica GEMINI_API_KEY.');
+    }
     throw httpError(503, 'No se pudo conectar con el proveedor de IA.');
   } finally {
     clearTimeout(timeout);
   }
 
-  const content = data?.choices?.[0]?.message?.content;
+  const content = provider.name === 'gemini'
+    ? (Array.isArray(data?.candidates?.[0]?.content?.parts)
+      ? data.candidates[0].content.parts
+        .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+        .filter(Boolean)
+        .join('\n')
+      : '')
+    : data?.choices?.[0]?.message?.content;
   if (typeof content !== 'string' || !content.trim()) {
     throw httpError(502, 'La IA devolvió una respuesta vacía');
   }

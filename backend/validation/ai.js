@@ -4,9 +4,9 @@ const { AI_PROVIDERS, ok, fail } = require('./core');
 
 function validateAiProvider(value) {
   if (value === undefined || value === null) return ok(null);
-  if (typeof value !== 'string') return fail('provider debe ser groq u ollama');
+  if (typeof value !== 'string') return fail('provider debe ser groq, ollama o gemini');
   const provider = value.trim().toLowerCase();
-  if (!AI_PROVIDERS.has(provider)) return fail('provider debe ser groq u ollama');
+  if (!AI_PROVIDERS.has(provider)) return fail('provider debe ser groq, ollama o gemini');
   return ok(provider);
 }
 

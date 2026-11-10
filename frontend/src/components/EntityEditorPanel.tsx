@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, memo } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { EntityNodeData, Attribute, Method } from '../types/diagram';
 import EntityMethodsEditor from './EntityMethodsEditor';
 
@@ -23,6 +23,8 @@ interface EntityEditorPanelProps {
   nodeId: string;
   initialData: EntityNodeData;
   onSave: (id: string, data: EntityNodeData) => void;
+  onAutoSave?: (id: string, data: EntityNodeData) => void;
+  onHeartbeat?: () => void;
   onClose: () => void;
   associationInfo?: AssociationInfo | null;
   onDissolveAssociation?: () => void;
@@ -33,6 +35,8 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
   nodeId,
   initialData,
   onSave,
+  onAutoSave,
+  onHeartbeat,
   onClose,
   associationInfo,
   onDissolveAssociation,
@@ -43,18 +47,86 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
   const [methods, setMethods] = useState<Method[]>(initialData.methods || []);
   const [stereotype, setStereotype] = useState<'class' | 'interface'>(initialData.stereotype || 'class');
 
+  const defaultLabel = stereotype === 'interface' ? 'NuevaInterfaz' : 'NuevaClase';
+  const dirtyRef = useRef(false);
+  const nodeIdRef = useRef(nodeId);
+  const onAutoSaveRef = useRef(onAutoSave);
+  const onHeartbeatRef = useRef(onHeartbeat);
+  onAutoSaveRef.current = onAutoSave;
+  onHeartbeatRef.current = onHeartbeat;
+  const latestRef = useRef({ label, attributes, methods, stereotype });
+  latestRef.current = { label, attributes, methods, stereotype };
+
+  const markDirty = () => {
+    dirtyRef.current = true;
+  };
+
   useEffect(() => {
+    if (nodeIdRef.current !== nodeId) {
+      if (dirtyRef.current) {
+        const previousId = nodeIdRef.current;
+        const previous = latestRef.current;
+        onAutoSaveRef.current?.(previousId, {
+          label: (previous.label || '').trim() || (previous.stereotype === 'interface' ? 'NuevaInterfaz' : 'NuevaClase'),
+          attributes: previous.attributes,
+          methods: previous.methods,
+          stereotype: previous.stereotype,
+        });
+      }
+      nodeIdRef.current = nodeId;
+      dirtyRef.current = false;
+      setLabel(initialData.label);
+      setAttributes(initialData.attributes || []);
+      setMethods(initialData.methods || []);
+      setStereotype(initialData.stereotype || 'class');
+      return;
+    }
+
+    if (dirtyRef.current) return;
     setLabel(initialData.label);
     setAttributes(initialData.attributes || []);
     setMethods(initialData.methods || []);
     setStereotype(initialData.stereotype || 'class');
   }, [nodeId, initialData.label, initialData.attributes, initialData.methods, initialData.stereotype]);
 
-  const defaultLabel = stereotype === 'interface' ? 'NuevaInterfaz' : 'NuevaClase';
+  useEffect(() => {
+    const heartbeat = () => onHeartbeatRef.current?.();
+    heartbeat();
+    const interval = setInterval(heartbeat, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!dirtyRef.current) return;
+    const timer = setTimeout(() => {
+      if (!dirtyRef.current) return;
+      onAutoSaveRef.current?.(nodeId, {
+        label: (label || '').trim() || defaultLabel,
+        attributes,
+        methods,
+        stereotype,
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [nodeId, label, attributes, methods, stereotype, defaultLabel]);
+
+  useEffect(() => {
+    return () => {
+      if (!dirtyRef.current) return;
+      const latest = latestRef.current;
+      onAutoSaveRef.current?.(nodeIdRef.current, {
+        label: (latest.label || '').trim() || (latest.stereotype === 'interface' ? 'NuevaInterfaz' : 'NuevaClase'),
+        attributes: latest.attributes,
+        methods: latest.methods,
+        stereotype: latest.stereotype,
+      });
+    };
+  }, []);
 
   const handleSave = () => {
     const normalizedLabel = (label || "").trim() || defaultLabel;
     if (normalizedLabel !== label) setLabel(normalizedLabel);
+    dirtyRef.current = false;
     onSave(nodeId, { label: normalizedLabel, attributes, methods, stereotype });
   };
 
@@ -67,14 +139,17 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
       nullable: true,
       unique: false,
     };
+    markDirty();
     setAttributes([...attributes, newAttr]);
   };
 
   const handleRemoveAttribute = (attrId: string) => {
+    markDirty();
     setAttributes(attributes.filter((a) => a.id !== attrId));
   };
 
   const handleUpdateAttribute = (attrId: string, field: keyof Attribute, value: any) => {
+    markDirty();
     setAttributes(
       attributes.map((a) => (a.id === attrId ? { ...a, [field]: value } : a))
     );
@@ -88,14 +163,17 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
       parameters: [],
       visibility: 'public',
     };
+    markDirty();
     setMethods([...methods, newMethod]);
   };
 
   const handleRemoveMethod = (methodId: string) => {
+    markDirty();
     setMethods(methods.filter((m) => m.id !== methodId));
   };
 
   const handleUpdateMethod = (methodId: string, field: keyof Method, value: any) => {
+    markDirty();
     setMethods(
       methods.map((m) => (m.id === methodId ? { ...m, [field]: value } : m))
     );
@@ -103,6 +181,7 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
 
   const handleAddParameter = (methodId: string) => {
     const newParam = { name: 'param', type: 'String' };
+    markDirty();
     setMethods(
       methods.map((m) =>
         m.id === methodId ? { ...m, parameters: [...m.parameters, newParam] } : m
@@ -111,6 +190,7 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
   };
 
   const handleRemoveParameter = (methodId: string, paramIndex: number) => {
+    markDirty();
     setMethods(
       methods.map((m) =>
         m.id === methodId
@@ -121,6 +201,7 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
   };
 
   const handleUpdateParameter = (methodId: string, paramIndex: number, field: 'name' | 'type', value: any) => {
+    markDirty();
     setMethods(
       methods.map((m) =>
         m.id === methodId
@@ -164,7 +245,7 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
           <input
             type="text"
             value={label || ""}
-            onChange={(e) => setLabel(e.target.value)}
+            onChange={(e) => { markDirty(); setLabel(e.target.value); }}
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           />
@@ -186,7 +267,7 @@ const EntityEditorPanel = memo(function EntityEditorPanel({
           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Estereotipo</label>
           <select
             value={stereotype}
-            onChange={(e) => setStereotype(e.target.value as 'class' | 'interface')}
+            onChange={(e) => { markDirty(); setStereotype(e.target.value as 'class' | 'interface'); }}
             className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           >
             <option value="class">Clase</option>

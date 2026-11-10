@@ -15,6 +15,8 @@ interface EditorPanelsProps {
   associationInfo: { fromName: string; toName: string; isLegacy: boolean } | null;
   duplicateName: boolean;
   onSaveNode: (id: string, data: EntityNodeData) => void;
+  onAutoSaveNode?: (id: string, data: EntityNodeData) => void;
+  onHeartbeat?: () => void;
   onDeleteNode: () => void;
   onDissolveAssociation: () => void;
   onCloseEntity: () => void;
@@ -32,6 +34,8 @@ export default function EditorPanels({
   associationInfo,
   duplicateName,
   onSaveNode,
+  onAutoSaveNode,
+  onHeartbeat,
   onDeleteNode,
   onDissolveAssociation,
   onCloseEntity,
@@ -47,6 +51,8 @@ export default function EditorPanels({
             nodeId={selectedNodeId}
             initialData={selectedData}
             onSave={onSaveNode}
+            onAutoSave={onAutoSaveNode}
+            onHeartbeat={onHeartbeat}
             onClose={onCloseEntity}
             associationInfo={associationInfo}
             onDissolveAssociation={onDissolveAssociation}

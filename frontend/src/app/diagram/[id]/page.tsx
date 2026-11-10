@@ -59,7 +59,6 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const { config: aiConfig, setConfig: setAiConfig } = useAiProvider();
   const {
     authEnabled,
-    user,
     diagramRole,
     roleLoading,
     isViewer,
@@ -97,9 +96,23 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     connectedUsers,
     provider,
     updateEdge,
-  } = useCollaborativeFlow(currentRoom, diagramsLoaded && Boolean(currentDiagramId));
+  } = useCollaborativeFlow(
+    currentRoom,
+    diagramsLoaded && Boolean(currentDiagramId),
+    selectedNodeId
+  );
 
   const nodeLocks = useNodeLocks(provider);
+
+  const publishEditingLock = useCallback(() => {
+    if (!provider || !selectedNodeId) return;
+    try {
+      provider.awareness.setLocalStateField('editing', {
+        nodeId: selectedNodeId,
+        timestamp: Date.now(),
+      });
+    } catch {}
+  }, [provider, selectedNodeId]);
 
   useDiagramLoader({
     currentDiagramId,
@@ -125,6 +138,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     isFromImage,
     handleSendCommand,
     handleVoiceCommand,
+    handleCancel,
     handleFromImage,
   } = useAICommand({
     diagramId: currentDiagramId || '',
@@ -292,6 +306,8 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
             associationInfo={selectedNodeAssociationInfo}
             duplicateName={duplicateNodeName}
             onSaveNode={handleSaveNode}
+            onAutoSaveNode={handleSaveNode}
+            onHeartbeat={publishEditingLock}
             onDeleteNode={handleDeleteSelectedNode}
             onDissolveAssociation={() => selectedNodeId && handleDissolveAssociationClass(selectedNodeId)}
             onCloseEntity={handleCloseEntityPanel}
@@ -342,8 +358,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
             nodes={nodes}
             edges={edges}
             nodeLocks={nodeLocks}
-            user={user}
-            connectedUsers={connectedUsers}
+            localClientId={provider?.awareness.clientID ?? null}
             isViewer={isViewer}
             pendingSource={pendingSource}
             isConnecting={isConnecting}
@@ -365,6 +380,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
           command={command}
           setCommand={setCommand}
           onSendCommand={handleSendCommand}
+          onCancel={handleCancel}
           isProcessing={isProcessing}
           isRecording={isRecording}
           onVoiceCommand={handleVoiceCommand}

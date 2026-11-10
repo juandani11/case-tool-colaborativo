@@ -21,13 +21,17 @@ const CHANGE_EVENT = 'case-tool:ai-config-change';
 
 let cachedConfig: AiConfig | null = null;
 
+function normalizeProvider(value: unknown): AiProvider {
+  return value === 'ollama' || value === 'gemini' ? value : 'groq';
+}
+
 function readConfig(): AiConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AiConfig>;
       return {
-        provider: parsed.provider === 'ollama' ? 'ollama' : 'groq',
+        provider: normalizeProvider(parsed.provider),
         ollamaUrl: typeof parsed.ollamaUrl === 'string' && parsed.ollamaUrl.trim()
           ? parsed.ollamaUrl.trim()
           : DEFAULT_AI_CONFIG.ollamaUrl,
@@ -39,7 +43,7 @@ function readConfig(): AiConfig {
     const legacyProvider = localStorage.getItem(LEGACY_PROVIDER_KEY);
     return {
       ...DEFAULT_AI_CONFIG,
-      provider: legacyProvider === 'ollama' ? 'ollama' : 'groq',
+      provider: normalizeProvider(legacyProvider),
     };
   } catch {
     return DEFAULT_AI_CONFIG;
@@ -73,7 +77,7 @@ export function useAiProvider() {
 
   const setConfig = useCallback((value: AiConfig) => {
     const next: AiConfig = {
-      provider: value.provider === 'ollama' ? 'ollama' : 'groq',
+      provider: normalizeProvider(value.provider),
       ollamaUrl: value.ollamaUrl.trim() || DEFAULT_AI_CONFIG.ollamaUrl,
       ollamaModel: value.ollamaModel.trim() || DEFAULT_AI_CONFIG.ollamaModel,
     };

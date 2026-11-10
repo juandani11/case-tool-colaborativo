@@ -19,6 +19,7 @@ import DashedEdge from '../DashedEdge';
 import SelfLoopEdge from '../edges/SelfLoopEdge';
 import AssociationClassConnector from '../AssociationClassConnector';
 import { EntityNodeData, RelationshipData } from '../../types/diagram';
+import type { NodeLock } from '../../hooks/useNodeLocks';
 
 const nodeTypes = { entity: EntityNode };
 const edgeTypes = {
@@ -33,9 +34,8 @@ const edgeTypes = {
 interface EditorFlowProps {
   nodes: Node<EntityNodeData>[];
   edges: Edge<RelationshipData>[];
-  nodeLocks: Map<string, any>;
-  user: any;
-  connectedUsers: any[];
+  nodeLocks: Map<string, NodeLock>;
+  localClientId: number | null;
   isViewer: boolean;
   pendingSource: string | null;
   isConnecting: boolean;
@@ -56,8 +56,7 @@ export default function EditorFlow({
   nodes,
   edges,
   nodeLocks,
-  user,
-  connectedUsers,
+  localClientId,
   isViewer,
   pendingSource,
   isConnecting,
@@ -78,9 +77,7 @@ export default function EditorFlow({
       <ReactFlow
         nodes={nodes.map(n => {
           const lock = nodeLocks.get(n.id);
-          const isOwnLock = lock && user && connectedUsers.some(
-            u => u.id === user.id && u.name === lock.name
-          );
+          const isOwnLock = !!lock && lock.clientId === localClientId;
           const isPendingSource = pendingSource === n.id;
           return {
             ...n,

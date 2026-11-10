@@ -185,7 +185,7 @@ router.post('/transcribe', requireAuth, upload.single('audio'), asyncHandler(asy
   if (!apiKey) throw httpError(503, 'El servicio de transcripción no está configurado');
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const ext = req.file.mimetype.split('/')[1] || 'webm';
     const file = new File([req.file.buffer], `recording.${ext}`, { type: req.file.mimetype });
@@ -210,7 +210,8 @@ router.post('/transcribe', requireAuth, upload.single('audio'), asyncHandler(asy
 
     const data = await response.json();
     const text = typeof data.text === 'string' ? data.text.trim().slice(0, 10000) : '';
-    if (!text) throw httpError(502, 'La transcripción no devolvió texto válido');
+    // Silencio o audio sin voz: 200 con texto vacío para que el frontend
+    // muestre "No se detectó voz" sin tratarlo como error del proveedor.
     res.json({ text });
   } catch (err) {
     if (err.name === 'AbortError') throw httpError(504, 'La transcripción tardó demasiado');

@@ -31,7 +31,11 @@ import { buildChatMessage, dedupeChatMessages } from '../utils/chatMessage';
 import type { ChatMessage, ConnectedUser } from '../types/collaboration';
 export type { ChatMessage, ConnectedUser } from '../types/collaboration';
 
-export function useCollaborativeFlow(roomName: string, enabled = true) {
+export function useCollaborativeFlow(
+  roomName: string,
+  enabled = true,
+  selectedNodeId: string | null = null
+) {
   const [nodes, setNodes] = useState<any[]>([]);
   const [edges, setEdges] = useState<any[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -223,14 +227,13 @@ export function useCollaborativeFlow(roomName: string, enabled = true) {
   useEffect(() => {
     const provider = providerRef.current;
     if (!provider) return;
-    const selectedNodeId = nodes.find((n: any) => n.selected)?.id || null;
     try {
       provider.awareness.setLocalStateField('editing', {
         nodeId: selectedNodeId,
         timestamp: Date.now(),
       });
     } catch {}
-  }, [nodes]);
+  }, [selectedNodeId, provider]);
 
   // Actualizar la identidad publicada cuando cambia la sesión (login,
   // logout o carga inicial), sin recrear el provider ni el documento.

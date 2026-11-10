@@ -62,6 +62,13 @@ export function useAICommand(options: AICommandOptions) {
   const [isFromImage, setIsFromImage] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const transcriptionAbortRef = useRef<AbortController | null>(null);
+  const commandAbortRef = useRef<AbortController | null>(null);
+  const discardRecordingRef = useRef(false);
   const chunksRef = useRef<Blob[]>([]);
   // Espejos sincronos del estado para callbacks diferidos (onstop de
   // MediaRecorder, setTimeout de auto-envio): el state de React llega tarde
@@ -79,11 +86,53 @@ export function useAICommand(options: AICommandOptions) {
   }, []);
 
   // Limpia el auto-envio pendiente al desmontar (no enviar a un editor cerrado).
+  const clearRecordingResources = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (silenceIntervalRef.current) {
+      clearInterval(silenceIntervalRef.current);
+      silenceIntervalRef.current = null;
+    }
+    const audioContext = audioContextRef.current;
+    audioContextRef.current = null;
+    if (audioContext) {
+      audioContext.close().catch(() => {});
+    }
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  }, []);
+
   useEffect(() => {
     return () => {
       if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+      clearRecordingResources();
+      transcriptionAbortRef.current?.abort('cancel');
+      commandAbortRef.current?.abort('cancel');
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch {}
+      }
     };
-  }, []);
+  }, [clearRecordingResources]);
+
+  const handleCancel = useCallback(() => {
+    discardRecordingRef.current = true;
+    transcriptionAbortRef.current?.abort('cancel');
+    commandAbortRef.current?.abort('cancel');
+    if (autoSendTimerRef.current) {
+      clearTimeout(autoSendTimerRef.current);
+      autoSendTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    clearRecordingResources();
+    processingRef.current = false;
+    setIsProcessing(false);
+    setIsRecording(false);
+    optionsRef.current.addMessage('system', 'Operación cancelada.');
+  }, [clearRecordingResources]);
 
   // Núcleo de envío: texto explícito + guard anti-doble-envío (vacío o ya
   // procesando). Estable entre renders para que onstop/timeout lo llamen sin
@@ -105,11 +154,15 @@ export function useAICommand(options: AICommandOptions) {
 
     processingRef.current = true;
     setIsProcessing(true);
+    const controller = new AbortController();
+    commandAbortRef.current = controller;
+    const timeout = setTimeout(() => controller.abort('timeout'), 30000);
     try {
       const ast = nodesToAST(opts.nodes, opts.edges);
       const response = await apiFetch(`${API_BASE}/api/ai/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           command: trimmed,
           currentState: ast,
@@ -162,9 +215,17 @@ export function useAICommand(options: AICommandOptions) {
       }
       setCommand('');
     } catch (error) {
-      console.error('Error al comunicarse con el servidor:', error);
-      opts.addMessage('ia', 'No se pudo conectar con el servidor de IA.');
+      if (controller.signal.aborted) {
+        if (controller.signal.reason === 'timeout') {
+          opts.addMessage('system', 'La IA tardó demasiado en responder. Intenta de nuevo.');
+        }
+      } else {
+        console.error('Error al comunicarse con el servidor:', error);
+        opts.addMessage('ia', 'No se pudo conectar con el servidor de IA.');
+      }
     } finally {
+      clearTimeout(timeout);
+      if (commandAbortRef.current === controller) commandAbortRef.current = null;
       processingRef.current = false;
       setIsProcessing(false);
     }
@@ -177,14 +238,16 @@ export function useAICommand(options: AICommandOptions) {
 
   const handleVoiceCommand = useCallback(async () => {
     if (isRecording) {
-      // Stop recording
       mediaRecorderRef.current?.stop();
       return;
     }
 
-    // Start recording
+    discardRecordingRef.current = false;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
@@ -196,9 +259,22 @@ export function useAICommand(options: AICommandOptions) {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
+      mediaRecorder.onerror = (event) => {
+        console.error('Error de grabación de audio:', event);
+        clearRecordingResources();
         setIsRecording(false);
+        setIsProcessing(false);
+        optionsRef.current.addMessage('system', 'Error al grabar audio. Intenta de nuevo.');
+      };
+
+      mediaRecorder.onstop = async () => {
+        clearRecordingResources();
+        setIsRecording(false);
+
+        if (discardRecordingRef.current) {
+          discardRecordingRef.current = false;
+          return;
+        }
 
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
         if (blob.size === 0) {
@@ -208,6 +284,11 @@ export function useAICommand(options: AICommandOptions) {
 
         setIsProcessing(true);
         optionsRef.current.addMessage('system', 'Transcribiendo audio...');
+
+        const controller = new AbortController();
+        transcriptionAbortRef.current = controller;
+        const timeout = setTimeout(() => controller.abort('timeout'), 10000);
+
         try {
           const formData = new FormData();
           formData.append('audio', blob, 'recording.webm');
@@ -215,11 +296,12 @@ export function useAICommand(options: AICommandOptions) {
           const res = await apiFetch(`${API_BASE}/api/ai/transcribe`, {
             method: 'POST',
             body: formData,
+            signal: controller.signal,
           });
 
           if (!res.ok) {
-            const err = await res.json();
-            optionsRef.current.addMessage('ia', 'Error de transcripción: ' + (err.error || 'Error desconocido'));
+            const err = await res.json().catch(() => null);
+            optionsRef.current.addMessage('ia', 'Error de transcripción: ' + (err?.error || 'Error desconocido'));
             return;
           }
 
@@ -228,11 +310,6 @@ export function useAICommand(options: AICommandOptions) {
             const transcript = data.text.trim();
             setCommand(transcript);
             optionsRef.current.addMessage('system', `Transcripción: "${transcript}"`);
-            // Auto-envío: el usuario ya habló, no debe presionar Enviar.
-            // Delay para que vea el texto antes de que se procese; se lee el
-            // input VIGENTE (no el transcript capturado): si lo vació con un
-            // Enter manual en esos 400 ms, el guard de sendCommandText no envía.
-            // Transcripción vacía o fallida: no se envía nada.
             if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
             autoSendTimerRef.current = setTimeout(() => {
               sendCommandText(commandRef.current);
@@ -241,9 +318,17 @@ export function useAICommand(options: AICommandOptions) {
             optionsRef.current.addMessage('system', 'No se detectó voz en el audio.');
           }
         } catch (err) {
-          console.error('Error transcribiendo:', err);
-          optionsRef.current.addMessage('ia', 'No se pudo conectar con el servicio de transcripción.');
+          if (controller.signal.aborted) {
+            if (controller.signal.reason === 'timeout') {
+              optionsRef.current.addMessage('system', 'La transcripción tardó demasiado. Intenta de nuevo.');
+            }
+          } else {
+            console.error('Error transcribiendo:', err);
+            optionsRef.current.addMessage('ia', 'No se pudo conectar con el servicio de transcripción.');
+          }
         } finally {
+          clearTimeout(timeout);
+          if (transcriptionAbortRef.current === controller) transcriptionAbortRef.current = null;
           setIsProcessing(false);
         }
       };
@@ -251,8 +336,52 @@ export function useAICommand(options: AICommandOptions) {
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start();
       setIsRecording(true);
+
+      // Si no hay voz en 5 s, detiene la grabación automáticamente.
+      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextCtor) {
+        const audioContext = new AudioContextCtor();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.fftSize);
+        let speechDetected = false;
+        let silentSince = Date.now();
+
+        audioContextRef.current = audioContext;
+        silenceIntervalRef.current = setInterval(() => {
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const value = (data[i] - 128) / 128;
+            sum += value * value;
+          }
+          const rms = Math.sqrt(sum / data.length);
+          if (rms > 0.02) {
+            speechDetected = true;
+            silentSince = Date.now();
+          } else if (!speechDetected && Date.now() - silentSince > 5000) {
+            if (silenceIntervalRef.current) {
+              clearInterval(silenceIntervalRef.current);
+              silenceIntervalRef.current = null;
+            }
+            try { mediaRecorder.stop(); } catch {}
+          }
+        }, 200);
+      }
+
+      // Límite absoluto para que el micrófono nunca quede abierto.
+      recordingTimerRef.current = setTimeout(() => {
+        try {
+          if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        } catch {}
+      }, 15000);
     } catch (err: any) {
+      clearRecordingResources();
       console.error('Error accediendo al micrófono:', err);
+      setIsRecording(false);
+      setIsProcessing(false);
       if (err.name === 'NotAllowedError') {
         optionsRef.current.addMessage('system', 'Permiso de micrófono denegado. Habilita el acceso en la configuración del navegador.');
       } else if (err.name === 'NotFoundError') {
@@ -261,7 +390,7 @@ export function useAICommand(options: AICommandOptions) {
         optionsRef.current.addMessage('ia', 'Error al acceder al micrófono: ' + err.message);
       }
     }
-  }, [isRecording, sendCommandText]);
+  }, [clearRecordingResources, isRecording, sendCommandText]);
 
   const handleFromImage = useCallback(async (file: File) => {
     if (isProcessing || isFromImage) return;
@@ -319,6 +448,7 @@ export function useAICommand(options: AICommandOptions) {
     isFromImage,
     handleSendCommand,
     handleVoiceCommand,
+    handleCancel,
     handleFromImage,
   };
 }
