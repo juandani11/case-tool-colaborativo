@@ -211,7 +211,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const handleOnConnect = useEdgeCreation(connectionType, addEdge);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-100 overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-gray-100 text-gray-900 overflow-hidden">
       <Toolbar
         isConnected={isConnected}
         onAddEntity={handleAddEntity}

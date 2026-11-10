@@ -274,7 +274,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* Header */}
       <header className={DS.header.base}>
         <div className={DS.header.inner}>

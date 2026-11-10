@@ -158,7 +158,7 @@ function ChatPanelInner({
 
   return (
     <div
-      className="relative w-[var(--chat-width)] max-w-[100vw] flex-shrink-0 bg-white border-l border-gray-200 flex flex-col h-full max-h-full overflow-hidden max-sm:fixed max-sm:inset-y-0 max-sm:right-0 max-sm:z-40 max-sm:w-screen max-sm:shadow-2xl"
+      className="relative w-[var(--chat-width)] max-w-[100vw] flex-shrink-0 bg-white border-l border-gray-200 flex flex-col h-full max-h-full overflow-hidden text-gray-900 max-sm:fixed max-sm:inset-y-0 max-sm:right-0 max-sm:z-40 max-sm:w-screen max-sm:shadow-2xl"
       style={{ '--chat-width': `${panelWidth}px` } as React.CSSProperties}
     >
       <div
