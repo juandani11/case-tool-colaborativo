@@ -192,6 +192,7 @@ function ChatPanelInner({
             aria-label="Motor de IA"
           >
             <option value="groq">Groq (Nube)</option>
+            <option value="gemini">Google Gemini (Nube)</option>
             <option value="ollama">Ollama (Local)</option>
           </select>
           <button
