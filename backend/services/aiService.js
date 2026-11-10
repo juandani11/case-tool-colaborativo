@@ -8,8 +8,22 @@ const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/v1';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 const GEMINI_API_BASE = process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta';
-const GEMINI_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || GEMINI_TEXT_MODEL;
+const GEMINI_PREFERRED_MODEL = 'gemini-2.0-flash';
+const GEMINI_DEPRECATED_MODELS = new Set([
+  'gemini-pro',
+  'gemini-1.5-pro',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-latest',
+]);
+
+function normalizeGeminiModel(value) {
+  const model = String(value || '').trim();
+  if (!model || GEMINI_DEPRECATED_MODELS.has(model)) return GEMINI_PREFERRED_MODEL;
+  return model;
+}
+
+const GEMINI_TEXT_MODEL = normalizeGeminiModel(process.env.GEMINI_MODEL);
+const GEMINI_VISION_MODEL = normalizeGeminiModel(process.env.GEMINI_VISION_MODEL || GEMINI_TEXT_MODEL);
 
 function trimTrailingSlash(value) {
   return String(value || '').replace(/\/+$/, '');
@@ -23,6 +37,16 @@ function readEnvValue(names) {
     if (value) return { value, name };
   }
   return { value: null, name: null };
+}
+
+function geminiModelCandidates(primary) {
+  const configured = process.env.GEMINI_FALLBACK_MODELS
+    || `${GEMINI_PREFERRED_MODEL},gemini-1.5-flash-latest`;
+  return [...new Set(
+    [normalizeGeminiModel(primary), GEMINI_PREFERRED_MODEL, ...String(configured).split(',')]
+      .map((value) => normalizeGeminiModel(value))
+      .filter(Boolean)
+  )];
 }
 
 // Patrón Strategy: Groq y Ollama comparten el contrato OpenAI-compatible;
@@ -246,9 +270,6 @@ Reglas CRÍTICAS:
       });
     }
     parts.push({ text: `${systemPrompt}\n\n${stateText}` });
-    requestUrl = `${provider.baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(provider.apiKey)}`;
-    // Log sin la key para poder verificar el proveedor en Railway.
-    console.log(`[ai] Gemini -> ${provider.baseUrl}/models/${model}:generateContent`);
     requestBody = {
       contents: [{ role: 'user', parts }],
       generationConfig: {
@@ -274,51 +295,76 @@ Reglas CRÍTICAS:
 
   const maxAttempts = provider.name === 'gemini' ? 2 : 1;
   const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+  const modelsToTry = provider.name === 'gemini' ? geminiModelCandidates(model) : [model];
   let data = null;
+  let lastGeminiStatus = null;
 
   try {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-      try {
-        const response = await fetch(requestUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
-        });
+    for (const candidateModel of modelsToTry) {
+      const candidateUrl = provider.name === 'gemini'
+        ? `${provider.baseUrl}/models/${encodeURIComponent(candidateModel)}:generateContent?key=${encodeURIComponent(provider.apiKey)}`
+        : requestUrl;
+      if (provider.name === 'gemini') {
+        // Log sin la key para verificar en Railway qué modelo se está probando.
+        console.log(`[ai] Gemini -> ${provider.baseUrl}/models/${candidateModel}:generateContent`);
+      }
 
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => '');
-          console.error(`${provider.name} respondió ${response.status}: ${errorText.slice(0, 300)}`);
-          const canRetry = provider.name === 'gemini'
-            && retryableStatuses.has(response.status)
-            && attempt < maxAttempts;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        try {
+          const response = await fetch(candidateUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            lastGeminiStatus = provider.name === 'gemini' ? response.status : lastGeminiStatus;
+            console.error(`${provider.name} respondió ${response.status}: ${errorText.slice(0, 300)}`);
+
+            if (provider.name === 'gemini' && response.status === 404) {
+              console.warn(`[ai] Gemini model ${candidateModel} no encontrado; probando fallback`);
+              break;
+            }
+
+            const canRetry = provider.name === 'gemini'
+              && retryableStatuses.has(response.status)
+              && attempt < maxAttempts;
+            if (canRetry) {
+              console.warn(`[ai] Gemini reintento ${attempt}/${maxAttempts - 1} por HTTP ${response.status}`);
+              await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+              continue;
+            }
+
+            if (provider.name === 'gemini') {
+              throw httpError(503, `Gemini no está disponible (HTTP ${response.status})`);
+            }
+            throw httpError(502, `El proveedor de IA respondió ${response.status}`);
+          }
+
+          data = await response.json();
+          break;
+        } catch (err) {
+          if (err.status) throw err;
+          if (err.name === 'AbortError') {
+            throw httpError(504, 'La IA tardó demasiado en responder');
+          }
+          const canRetry = provider.name === 'gemini' && attempt < maxAttempts;
           if (canRetry) {
-            console.warn(`[ai] Gemini reintento ${attempt}/${maxAttempts - 1} por HTTP ${response.status}`);
+            console.warn(`[ai] Gemini reintento ${attempt}/${maxAttempts - 1} por error de red`);
             await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
             continue;
           }
-          throw httpError(502, `El proveedor de IA respondió ${response.status}`);
+          throw err;
+        } finally {
+          clearTimeout(timeout);
         }
-
-        data = await response.json();
-        break;
-      } catch (err) {
-        if (err.status) throw err;
-        if (err.name === 'AbortError') {
-          throw httpError(504, 'La IA tardó demasiado en responder');
-        }
-        const canRetry = provider.name === 'gemini' && attempt < maxAttempts;
-        if (canRetry) {
-          console.warn(`[ai] Gemini reintento ${attempt}/${maxAttempts - 1} por error de red`);
-          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-          continue;
-        }
-        throw err;
-      } finally {
-        clearTimeout(timeout);
       }
+
+      if (data) break;
     }
   } catch (err) {
     if (err.status) throw err;
@@ -337,6 +383,14 @@ Reglas CRÍTICAS:
   }
 
   if (!data) {
+    if (provider.name === 'gemini') {
+      throw httpError(
+        503,
+        lastGeminiStatus === 404
+          ? 'Gemini no encontró ninguno de los modelos configurados. Revisa GEMINI_MODEL/GEMINI_FALLBACK_MODELS.'
+          : 'El proveedor Gemini no devolvió una respuesta válida.'
+      );
+    }
     throw httpError(502, 'El proveedor de IA no devolvió una respuesta válida');
   }
 
