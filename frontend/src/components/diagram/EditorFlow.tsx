@@ -81,10 +81,13 @@ export default function EditorFlow({
           const isPendingSource = pendingSource === n.id;
           return {
             ...n,
+            className: [
+              n.className,
+              isPendingSource ? 'pending-source-pulse' : '',
+            ].filter(Boolean).join(' ') || undefined,
             draggable: isViewer ? false : !lock || !!isOwnLock,
             style: {
-              ...(lock ? { boxShadow: `0 0 0 3px ${lock.color}` } : {}),
-              ...(isPendingSource ? { boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.5)' } : {}),
+              ...(lock && !isPendingSource ? { boxShadow: `0 0 0 3px ${lock.color}` } : {}),
               ...(isConnecting && !isPendingSource ? {
                 outline: '2px dashed #60a5fa',
                 outlineOffset: '4px',

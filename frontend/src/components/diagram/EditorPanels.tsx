@@ -12,6 +12,8 @@ interface EditorPanelsProps {
   selectedData?: EntityNodeData;
   selectedEdgeId: string | null;
   selectedEdgeData?: RelationshipData;
+  selectedEdgeSourceName?: string | null;
+  selectedEdgeTargetName?: string | null;
   associationInfo: { fromName: string; toName: string; isLegacy: boolean } | null;
   duplicateName: boolean;
   onSaveNode: (id: string, data: EntityNodeData) => void;
@@ -31,6 +33,8 @@ export default function EditorPanels({
   selectedData,
   selectedEdgeId,
   selectedEdgeData,
+  selectedEdgeSourceName,
+  selectedEdgeTargetName,
   associationInfo,
   duplicateName,
   onSaveNode,
@@ -72,6 +76,8 @@ export default function EditorPanels({
           <EdgeEditorPanel
             key={selectedEdgeId}
             edgeId={selectedEdgeId}
+            sourceName={selectedEdgeSourceName}
+            targetName={selectedEdgeTargetName}
             initialData={{
               type: (['ASSOCIATION', 'AGGREGATION', 'COMPOSITION', 'INHERITANCE'].includes(
                 selectedEdgeData.type || ''

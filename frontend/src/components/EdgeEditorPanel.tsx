@@ -16,6 +16,8 @@ interface EdgeEditorPanelProps {
   initialData: EdgeData;
   onSave: (data: EdgeData) => void;
   onClose: () => void;
+  sourceName?: string | null;
+  targetName?: string | null;
   // Clase asociativa (solo * a *): nombre del nodo vinculado (si existe,
   // modelo legacy) y acción para crearla (Opción A). Desvincular/restaurar
   // se hace desde el panel del nodo. Opcionales por compatibilidad.
@@ -49,6 +51,8 @@ export default function EdgeEditorPanel({
   initialData,
   onSave,
   onClose,
+  sourceName,
+  targetName,
   associationClassName,
   onConvertToAssociationClass,
 }: EdgeEditorPanelProps) {
@@ -130,9 +134,14 @@ export default function EdgeEditorPanel({
           </div>
         </div>
 
+        <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-2 text-[11px] leading-relaxed text-indigo-900">
+          <div><span className="font-semibold">Source:</span> {sourceName || 'Entidad origen'}</div>
+          <div><span className="font-semibold">Target:</span> {targetName || 'Entidad destino'}</div>
+        </div>
+
         {/* Cardinality From */}
         <div>
-          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cardinalidad origen</label>
+          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Multiplicidad (Origen / Source)</label>
           <select
             value={state.cardinalityFrom}
             onChange={(e) => handleChange('cardinalityFrom', e.target.value)}
@@ -146,7 +155,7 @@ export default function EdgeEditorPanel({
 
         {/* Cardinality To */}
         <div>
-          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cardinalidad destino</label>
+          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Multiplicidad (Destino / Target)</label>
           <select
             value={state.cardinalityTo}
             onChange={(e) => handleChange('cardinalityTo', e.target.value)}

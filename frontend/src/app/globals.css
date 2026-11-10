@@ -25,3 +25,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 }
+
+@keyframes pendingSourcePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.9), 0 0 18px rgba(59, 130, 246, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(59, 130, 246, 0.35), 0 0 26px rgba(59, 130, 246, 0.6);
+  }
+}
+
+.pending-source-pulse {
+  border-radius: 8px;
+  animation: pendingSourcePulse 1.3s ease-in-out infinite;
+}

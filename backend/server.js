@@ -50,7 +50,7 @@ process.once('SIGINT', () => {
 initializeDatabase()
   .then(() => {
     server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Servidor escuchando en el puerto ${PORT}`);
+      console.log(`Servidor escuchando en 0.0.0.0:${PORT}`);
     });
   })
   .catch((err) => {

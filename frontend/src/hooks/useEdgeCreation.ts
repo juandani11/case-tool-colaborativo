@@ -4,20 +4,21 @@ import { useCallback } from 'react';
 import { RelationshipData, UmlRelationshipType } from '../types/diagram';
 
 export function useEdgeCreation(
-  connectionType: UmlRelationshipType,
+  connectionType: UmlRelationshipType | string | null,
   addEdge: (edge: any) => void
 ) {
   return useCallback((connection: any) => {
+    const normalizedType = String(connectionType || 'ASSOCIATION').toUpperCase();
     let edgeType = 'association';
     let relationshipType: RelationshipData['type'] = 'ASSOCIATION';
 
-    if (connectionType === 'INHERITANCE') {
+    if (normalizedType === 'INHERITANCE') {
       edgeType = 'inheritance';
       relationshipType = 'INHERITANCE';
-    } else if (connectionType === 'AGGREGATION') {
+    } else if (normalizedType === 'AGGREGATION') {
       edgeType = 'aggregation';
       relationshipType = 'AGGREGATION';
-    } else if (connectionType === 'COMPOSITION') {
+    } else if (normalizedType === 'COMPOSITION') {
       edgeType = 'composition';
       relationshipType = 'COMPOSITION';
     }

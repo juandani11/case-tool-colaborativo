@@ -118,14 +118,16 @@ async function getMutationsFromAI(command, currentState, imageBuffer, imageMime,
   if (provider.name === 'groq' && !provider.apiKey) {
     throw httpError(503, 'El proveedor Groq no está configurado');
   }
+  if (provider.name === 'gemini') {
+    console.log(
+      `[ai] Gemini key configurada: ${Boolean(provider.apiKey)} (source: ${provider.keySource || 'none'})`
+    );
+  }
   if (provider.name === 'gemini' && !provider.apiKey) {
     throw httpError(
       503,
       'Gemini no está configurado. Define GEMINI_API_KEY (o GOOGLE_API_KEY) en Railway y reinicia el backend.'
     );
-  }
-  if (provider.name === 'gemini') {
-    console.log(`[ai] Gemini key cargada desde ${provider.keySource}`);
   }
 
   const model = imageBuffer ? provider.visionModel : provider.textModel;
@@ -228,70 +230,98 @@ Reglas CRÍTICAS:
     userContent = `Estado actual del diagrama:\n${JSON.stringify(currentState, null, 2)}\n\nComando del usuario: "${command}"`;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
-  let response;
-  let data;
-  try {
-    const headers = { 'Content-Type': 'application/json' };
-    let requestUrl;
-    let requestBody;
+  const headers = { 'Content-Type': 'application/json' };
+  let requestUrl;
+  let requestBody;
 
-    if (provider.name === 'gemini') {
-      const stateText = `Estado actual del diagrama:\n${JSON.stringify(currentState, null, 2)}\n\nComando del usuario: "${command}"`;
-      const parts = [];
-      if (imageBuffer) {
-        parts.push({
-          inline_data: {
-            mime_type: imageMime,
-            data: imageBuffer.toString('base64'),
-          },
-        });
-      }
-      parts.push({ text: `${systemPrompt}\n\n${stateText}` });
-      requestUrl = `${provider.baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(provider.apiKey)}`;
-      // Log sin la key para poder verificar el proveedor en Railway.
-      console.log(`[ai] Gemini -> ${provider.baseUrl}/models/${model}:generateContent`);
-      requestBody = {
-        contents: [{ role: 'user', parts }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2000,
+  if (provider.name === 'gemini') {
+    const stateText = `Estado actual del diagrama:\n${JSON.stringify(currentState, null, 2)}\n\nComando del usuario: "${command}"`;
+    const parts = [];
+    if (imageBuffer) {
+      parts.push({
+        inline_data: {
+          mime_type: imageMime,
+          data: imageBuffer.toString('base64'),
         },
-      };
-    } else {
-      if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
-      // LocalTunnel devuelve HTML de advertencia en la primera petición.
-      if (provider.name === 'ollama') headers['Bypass-Tunnel-Reminder'] = 'true';
-      requestUrl = `${provider.baseUrl}/chat/completions`;
-      requestBody = {
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
+      });
+    }
+    parts.push({ text: `${systemPrompt}\n\n${stateText}` });
+    requestUrl = `${provider.baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(provider.apiKey)}`;
+    // Log sin la key para poder verificar el proveedor en Railway.
+    console.log(`[ai] Gemini -> ${provider.baseUrl}/models/${model}:generateContent`);
+    requestBody = {
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
         temperature: 0.1,
-        max_tokens: 2000,
-      };
+        maxOutputTokens: 2000,
+      },
+    };
+  } else {
+    if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+    // LocalTunnel devuelve HTML de advertencia en la primera petición.
+    if (provider.name === 'ollama') headers['Bypass-Tunnel-Reminder'] = 'true';
+    requestUrl = `${provider.baseUrl}/chat/completions`;
+    requestBody = {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      temperature: 0.1,
+      max_tokens: 2000,
+    };
+  }
+
+  const maxAttempts = provider.name === 'gemini' ? 2 : 1;
+  const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+  let data = null;
+
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch(requestUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '');
+          console.error(`${provider.name} respondió ${response.status}: ${errorText.slice(0, 300)}`);
+          const canRetry = provider.name === 'gemini'
+            && retryableStatuses.has(response.status)
+            && attempt < maxAttempts;
+          if (canRetry) {
+            console.warn(`[ai] Gemini reintento ${attempt}/${maxAttempts - 1} por HTTP ${response.status}`);
+            await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+            continue;
+          }
+          throw httpError(502, `El proveedor de IA respondió ${response.status}`);
+        }
+
+        data = await response.json();
+        break;
+      } catch (err) {
+        if (err.status) throw err;
+        if (err.name === 'AbortError') {
+          throw httpError(504, 'La IA tardó demasiado en responder');
+        }
+        const canRetry = provider.name === 'gemini' && attempt < maxAttempts;
+        if (canRetry) {
+          console.warn(`[ai] Gemini reintento ${attempt}/${maxAttempts - 1} por error de red`);
+          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+          continue;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeout);
+      }
     }
-
-    response = await fetch(requestUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`${provider.name} respondió ${response.status}: ${errorText.slice(0, 300)}`);
-      throw httpError(502, 'El proveedor de IA no pudo procesar la solicitud');
-    }
-
-    data = await response.json();
   } catch (err) {
     if (err.status) throw err;
-    if (err.name === 'AbortError') throw httpError(504, 'La IA tardó demasiado en responder');
     if (provider.name === 'ollama') {
       throw httpError(
         503,
@@ -301,11 +331,13 @@ Reglas CRÍTICAS:
       );
     }
     if (provider.name === 'gemini') {
-      throw httpError(503, 'No se pudo conectar con Google Gemini. Verifica GEMINI_API_KEY.');
+      throw httpError(503, 'No se pudo conectar con Google Gemini. Verifica GEMINI_API_KEY y la red de Railway.');
     }
     throw httpError(503, 'No se pudo conectar con el proveedor de IA.');
-  } finally {
-    clearTimeout(timeout);
+  }
+
+  if (!data) {
+    throw httpError(502, 'El proveedor de IA no devolvió una respuesta válida');
   }
 
   const content = provider.name === 'gemini'

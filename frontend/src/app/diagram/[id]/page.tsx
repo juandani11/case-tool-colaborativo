@@ -125,6 +125,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
   const {
     selectedData,
     duplicateNodeName,
+    selectedEdge,
     selectedEdgeData,
     selectedNodeAssociationInfo,
     selectedElementForAI,
@@ -222,7 +223,7 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleOnConnect = useEdgeCreation(connectionType, addEdge);
+  const handleOnConnect = useEdgeCreation(activeRelationType || connectionType, addEdge);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-100 text-gray-900 overflow-hidden">
@@ -303,6 +304,8 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
             selectedData={selectedData}
             selectedEdgeId={selectedEdgeId}
             selectedEdgeData={selectedEdgeData}
+            selectedEdgeSourceName={selectedEdge ? nodes.find((n) => n.id === selectedEdge.source)?.data.label : null}
+            selectedEdgeTargetName={selectedEdge ? nodes.find((n) => n.id === selectedEdge.target)?.data.label : null}
             associationInfo={selectedNodeAssociationInfo}
             duplicateName={duplicateNodeName}
             onSaveNode={handleSaveNode}
@@ -341,9 +344,17 @@ function EditorContent({ initialDiagramId }: { initialDiagramId?: string }) {
           {activeRelationType && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-blue-50 border border-blue-300 rounded-lg px-4 py-2 shadow-md flex items-center gap-3">
               <span className="text-sm text-blue-800">
-                {!pendingSource
-                  ? `Modo: ${activeRelationLabel}. Click en el nodo origen.`
-                  : `Click en el destino (o en el mismo nodo para self-loop).`}
+                {!pendingSource ? (
+                  <>
+                    Modo: <strong>{activeRelationLabel || activeRelationType}</strong>.
+                    Haz clic en el nodo <strong>ORIGEN</strong>.
+                  </>
+                ) : (
+                  <>
+                    Origen seleccionado. Ahora haz clic en el nodo <strong>DESTINO</strong>
+                    <span className="text-blue-600"> (o en el mismo nodo para self-loop)</span>.
+                  </>
+                )}
               </span>
               <button
                 onClick={cancelRelationMode}
