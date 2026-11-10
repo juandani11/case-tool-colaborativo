@@ -15,6 +15,16 @@ function trimTrailingSlash(value) {
   return String(value || '').replace(/\/+$/, '');
 }
 
+function readEnvValue(names) {
+  for (const name of names) {
+    const raw = process.env[name];
+    if (typeof raw !== 'string') continue;
+    const value = raw.trim().replace(/^(['"])(.*)\1$/, '$2');
+    if (value) return { value, name };
+  }
+  return { value: null, name: null };
+}
+
 // Patrón Strategy: Groq y Ollama comparten el contrato OpenAI-compatible;
 // Gemini usa su propio protocolo generateContent.
 function resolveAiProvider(overrides = null) {
@@ -38,12 +48,18 @@ function resolveAiProvider(overrides = null) {
   }
 
   if (provider === 'gemini') {
+    const key = readEnvValue([
+      'GEMINI_API_KEY',
+      'GOOGLE_API_KEY',
+      'GOOGLE_GENERATIVE_AI_API_KEY',
+    ]);
     return {
       name: 'gemini',
       baseUrl: trimTrailingSlash(GEMINI_API_BASE),
       textModel: GEMINI_TEXT_MODEL,
       visionModel: GEMINI_VISION_MODEL,
-      apiKey: process.env.GEMINI_API_KEY || null,
+      apiKey: key.value,
+      keySource: key.name,
     };
   }
 
@@ -103,7 +119,13 @@ async function getMutationsFromAI(command, currentState, imageBuffer, imageMime,
     throw httpError(503, 'El proveedor Groq no está configurado');
   }
   if (provider.name === 'gemini' && !provider.apiKey) {
-    throw httpError(503, 'El proveedor Gemini no está configurado');
+    throw httpError(
+      503,
+      'Gemini no está configurado. Define GEMINI_API_KEY (o GOOGLE_API_KEY) en Railway y reinicia el backend.'
+    );
+  }
+  if (provider.name === 'gemini') {
+    console.log(`[ai] Gemini key cargada desde ${provider.keySource}`);
   }
 
   const model = imageBuffer ? provider.visionModel : provider.textModel;
