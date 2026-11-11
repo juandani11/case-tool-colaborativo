@@ -138,19 +138,31 @@ function formatSelectedElement(selectedElement) {
 }
 
 async function getMutationsFromAI(command, currentState, imageBuffer, imageMime, username = 'Usuario', chatHistory = '', selectedElement = null, providerOptions = null) {
-  const provider = resolveAiProvider(providerOptions);
-  if (provider.name === 'groq' && !provider.apiKey) {
-    throw httpError(503, 'El proveedor Groq no está configurado');
-  }
+  let provider = resolveAiProvider(providerOptions);
+
   if (provider.name === 'gemini') {
     console.log(
       `[ai] Gemini key configurada: ${Boolean(provider.apiKey)} (source: ${provider.keySource || 'none'})`
     );
   }
+
+  // Si Gemini no tiene key pero Groq sí, degradamos automáticamente a Groq
+  // en lugar de romper el chat con un 503.
   if (provider.name === 'gemini' && !provider.apiKey) {
+    const groqKey = readEnvValue(['GROQ_API_KEY']).value;
+    if (groqKey) {
+      console.warn('[ai] Gemini sin API key; usando Groq como fallback');
+      provider = {
+        ...resolveAiProvider({ provider: 'groq' }),
+        fallbackFrom: 'gemini',
+      };
+    }
+  }
+
+  if ((provider.name === 'groq' || provider.name === 'gemini') && !provider.apiKey) {
     throw httpError(
       503,
-      'Gemini no está configurado. Define GEMINI_API_KEY (o GOOGLE_API_KEY) en Railway y reinicia el backend.'
+      'El proveedor de IA seleccionado no está configurado. Revisa las variables de entorno.'
     );
   }
 
@@ -233,6 +245,7 @@ Las acciones posibles son:
 - removeRelationship: { "action": "removeRelationship", "sourceEntity": string, "targetEntity": string }
 
 Reglas CRÍTICAS:
+- IDIOMA: NUNCA traduzcas nombres de entidades, atributos, métodos ni relaciones. Si el diagrama está en español, conserva exactamente nombres como "Libro", "Autor" o "titulo". No conviertas "Libro" en "Book" ni "titulo" en "title". Solo limpia caracteres especiales si es imprescindible.
 - NUNCA devuelvas mutaciones para una consulta teórica: en ese caso "mutations" DEBE ser [].
 - Devuelve SIEMPRE el objeto JSON completo con "response" y "mutations".
 - "response" SIEMPRE empieza con el nombre "${username}".
