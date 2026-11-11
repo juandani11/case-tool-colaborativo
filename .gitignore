@@ -1,0 +1,8 @@
+node_modules/
+.next/
+target/
+backend-generado/
+*.class
+*.zip
+.env
+.env.local
