@@ -126,7 +126,7 @@ function generateProject(ast) {
             .filter(r => r.jpaType === 'manyToOne' || r.jpaType === 'oneToOne')
             .map(r => r.fkColumn)
         );
-        const mappedAttributes = (entity.attributes || []).map(attr => {
+        const mapAttribute = (attr) => {
           const nameSnake = toSnakeCase(attr.name, 'Atributo');
           const isFkCollision = !attr.isPk && fkColumns.has(nameSnake);
           return {
@@ -143,7 +143,20 @@ function generateProject(ast) {
             isString: getJavaType(attr.type) === 'String',
             isFkCollision,
           };
-        });
+        };
+        const mappedAttributes = (entity.attributes || []).map(mapAttribute);
+
+        // Un hijo hereda los campos del padre en JPA. El DTO y el update deben
+        // exponer también esos campos para que un PUT al endpoint del hijo
+        // pueda actualizar, por ejemplo, "nombre" y "pais" a la vez.
+        const parentEntity = inheritance?.parentEntity
+          ? entities.find(e => e.name === inheritance.parentEntity)
+          : null;
+        const inheritedAttributes = parentEntity
+          ? (parentEntity.attributes || []).filter(a => !a.isPk).map(mapAttribute)
+          : [];
+        const dtoAttributes = [...inheritedAttributes, ...mappedAttributes]
+          .filter((attr, index, all) => all.findIndex(a => a.nameCamel === attr.nameCamel) === index);
 
         const context = {
           entityName: entity.name,
@@ -164,12 +177,14 @@ function generateProject(ast) {
           toEntitySnake: intermediateInfo ? intermediateInfo.toEntitySnake : null,
           primaryKey,
           attributes: mappedAttributes,
+          // Atributos propios + heredados, solo para DTO/servicio.
+          dtoAttributes,
           // Campos para getters/setters explícitos del modelo:
           // PK + atributos (sin colisiones FK) + campos de relaciones.
           accessors: buildModelAccessors(primaryKey, mappedAttributes, relations, inheritance),
           // Campos para getters/setters explícitos del DTO (sin duplicados:
           // si un atributo ya se llama como el FK auto-generado, se reutiliza).
-          dtoAccessors: buildDtoAccessors(primaryKey, mappedAttributes, relations),
+          dtoAccessors: buildDtoAccessors(primaryKey, dtoAttributes, relations),
           relations,
           sqlColumns: buildSqlColumns(mappedAttributes, relations, entity.tableName || snakeCase(entity.name)),
           inheritance,

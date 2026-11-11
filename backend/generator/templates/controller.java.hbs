@@ -48,9 +48,8 @@ public class {{entityNamePascal}}Controller {
     @PutMapping("/{id}")
     public ResponseEntity<{{entityNamePascal}}DTO> update(
             @PathVariable {{primaryKey.javaType}} id,
-            @Valid @RequestBody {{entityNamePascal}}DTO dto) {
-        dto.set{{primaryKey.namePascal}}(id);
-        return ResponseEntity.ok(service.save(dto));
+            @RequestBody {{entityNamePascal}}DTO dto) {
+        return ResponseEntity.ok(service.update(id, dto));
     }
 
     @DeleteMapping("/{id}")

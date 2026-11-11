@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.dto.{{entityNamePascal}}DTO;
 import com.example.demo.model.{{entityNamePascal}};
 import com.example.demo.repository.{{entityNamePascal}}Repository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +37,23 @@ public class {{entityNamePascal}}Service {
         return toDTO(repository.save(entity));
     }
 
+    public {{entityNamePascal}}DTO update({{primaryKey.javaType}} id, {{entityNamePascal}}DTO dto) {
+        {{entityNamePascal}} entity = repository.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("No existe {{entityNamePascal}} con id " + id));
+
+        {{#each dtoAttributes}}
+        {{#unless isPk}}
+        {{#unless isFkCollision}}
+        if (dto.get{{namePascal}}() != null) {
+            entity.set{{namePascal}}(dto.get{{namePascal}}());
+        }
+        {{/unless}}
+        {{/unless}}
+        {{/each}}
+
+        return toDTO(repository.save(entity));
+    }
+
     public void delete({{primaryKey.javaType}} id) {
         repository.deleteById(id);
     }
@@ -45,7 +63,7 @@ public class {{entityNamePascal}}Service {
     private {{entityNamePascal}}DTO toDTO({{entityNamePascal}} entity) {
         {{entityNamePascal}}DTO dto = new {{entityNamePascal}}DTO();
         dto.set{{primaryKey.namePascal}}(entity.get{{primaryKey.namePascal}}());
-        {{#each attributes}}
+        {{#each dtoAttributes}}
         {{#unless isPk}}
         {{#unless isFkCollision}}
         dto.set{{namePascal}}(entity.get{{namePascal}}());
@@ -57,7 +75,7 @@ public class {{entityNamePascal}}Service {
 
     private {{entityNamePascal}} toEntity({{entityNamePascal}}DTO dto) {
         {{entityNamePascal}} entity = new {{entityNamePascal}}();
-        {{#each attributes}}
+        {{#each dtoAttributes}}
         {{#unless isPk}}
         {{#unless isFkCollision}}
         entity.set{{namePascal}}(dto.get{{namePascal}}());

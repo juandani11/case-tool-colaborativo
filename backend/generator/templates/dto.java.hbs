@@ -14,7 +14,7 @@ public class {{entityNamePascal}}DTO {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private {{primaryKey.javaType}} {{primaryKey.nameCamel}};
 
-    {{#each attributes}}
+    {{#each dtoAttributes}}
     {{#unless isPk}}
     {{#unless nullable}}
     @NotNull(message = "{{name}} es obligatorio")
